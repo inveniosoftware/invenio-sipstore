@@ -27,15 +27,65 @@
 
 from __future__ import absolute_import, print_function
 
+import os
+import shutil
+import tempfile
+
 import pytest
 from flask import Flask
+from flask_cli import FlaskCLI
+from invenio_accounts import InvenioAccounts
+from invenio_db import db as db_
+from invenio_db import InvenioDB
+from invenio_jsonschemas import InvenioJSONSchemas
+from sqlalchemy_utils.functions import create_database, database_exists
+
+from invenio_sipstore import InvenioSIPStore
 
 
-@pytest.fixture()
-def app():
-    """Flask application fixture."""
-    app = Flask('testapp')
-    app.config.update(
-        TESTING=True
+@pytest.yield_fixture(scope='session')
+def instance_path():
+    """Default instance path."""
+    path = tempfile.mkdtemp()
+
+    yield path
+
+    shutil.rmtree(path)
+
+
+@pytest.fixture(scope='session')
+def config():
+    """Default configuration."""
+    return dict(
+        TESTING=True,
+        SECRET_KEY='CHANGE_ME',
+        SECURITY_PASSWORD_SALT='CHANGE_ME',
+        SQLALCHEMY_DATABASE_URI=os.environ.get(
+            'SQLALCHEMY_DATABASE_URI', 'sqlite://'),
     )
-    return app
+
+
+@pytest.yield_fixture(scope='session')
+def app(instance_path, config):
+    """Flask application fixture."""
+    app = Flask('testapp', instance_path=instance_path)
+    app.config.update(config)
+    FlaskCLI(app)
+    InvenioDB(app)
+    InvenioAccounts(app)
+    InvenioJSONSchemas(app)
+    InvenioSIPStore(app)
+
+    with app.app_context():
+        yield app
+
+
+@pytest.yield_fixture(scope='function')
+def db(app):
+    """Setup database."""
+    if not database_exists(str(db_.engine.url)):
+        create_database(str(db_.engine.url))
+    db_.create_all()
+    yield db_
+    db_.session.remove()
+    db_.drop_all()

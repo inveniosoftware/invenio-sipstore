@@ -22,21 +22,10 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-include *.rst
-include *.sh
-include *.txt
-include .dockerignore
-include .editorconfig
-include .tx/config
-include babel.ini
-include LICENSE
-include pytest.ini
-recursive-include docs *.bat
-recursive-include docs *.py
-recursive-include docs *.rst
-recursive-include docs Makefile
-recursive-include examples *.py
-recursive-include invenio_sipstore *.html
-recursive-include invenio_sipstore *.po *.pot *.mo
-recursive-include tests *.py
-recursive-include invenio_sipstore *.json
+"""Default configuration of Invenio-SIPStore module."""
+
+SIPSTORE_DEFAULT_AGENT_JSONSCHEMA = 'sipstore/agent-v1.0.0.json'
+"""Default JSON schema for extra SIP agent information."""
+
+SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
+"""Enable SIP agent validation by default."""

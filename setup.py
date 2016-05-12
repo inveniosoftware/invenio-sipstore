@@ -43,6 +43,9 @@ tests_require = [
 ]
 
 extras_require = {
+    'admin': [
+        'Flask-Admin>=1.3.0',
+    ],
     'docs': [
         'Sphinx>=1.3',
     ],
@@ -60,6 +63,12 @@ setup_requires = [
 
 install_requires = [
     'Flask-BabelEx>=0.9.2',
+    'invenio-db>=1.0.0a9',
+    'invenio-accounts>=1.0.0a10',
+    'invenio-pidstore>=1.0.0a7',
+    'invenio-jsonschemas>=1.0.0a3',
+    'invenio-files-rest>=1.0.0a1',
+    'jsonschema>=2.5.1',
 ]
 
 packages = find_packages()
@@ -86,12 +95,25 @@ setup(
     include_package_data=True,
     platforms='any',
     entry_points={
+        'invenio_db.models': [
+            'invenio_sipstore = invenio_sipstore.models',
+        ],
         'invenio_base.apps': [
             'invenio_sipstore = invenio_sipstore:InvenioSIPStore',
         ],
         'invenio_i18n.translations': [
             'messages = invenio_sipstore',
         ],
+        'invenio_jsonschemas.schemas': [
+            'sipstore = invenio_sipstore.jsonschemas',
+        ],
+        'invenio_admin.views': [
+            'invenio_sipstore_sip = invenio_sipstore.admin:sip_adminview',
+            'invenio_sipstore_sipfile = '
+            'invenio_sipstore.admin:sipfile_adminview',
+            'invenio_sipstore_recordsip = '
+            'invenio_sipstore.admin:recordsip_adminview',
+        ]
     },
     extras_require=extras_require,
     install_requires=install_requires,

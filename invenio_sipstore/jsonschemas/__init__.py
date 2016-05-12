@@ -22,21 +22,4 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-include *.rst
-include *.sh
-include *.txt
-include .dockerignore
-include .editorconfig
-include .tx/config
-include babel.ini
-include LICENSE
-include pytest.ini
-recursive-include docs *.bat
-recursive-include docs *.py
-recursive-include docs *.rst
-recursive-include docs Makefile
-recursive-include examples *.py
-recursive-include invenio_sipstore *.html
-recursive-include invenio_sipstore *.po *.pot *.mo
-recursive-include tests *.py
-recursive-include invenio_sipstore *.json
+"""Default JSON Schemas for SIPStore module."""

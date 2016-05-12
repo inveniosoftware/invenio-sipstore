@@ -26,6 +26,8 @@
 
 from __future__ import absolute_import, print_function
 
+from . import config
+
 
 class InvenioSIPStore(object):
     """Invenio-SIPStore extension."""
@@ -42,3 +44,6 @@ class InvenioSIPStore(object):
 
     def init_config(self, app):
         """Initialize configuration."""
+        for k in dir(config):
+            if k.startswith('SIPSTORE_'):
+                app.config.setdefault(k, getattr(config, k))
