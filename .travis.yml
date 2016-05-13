@@ -60,3 +60,14 @@ script:
 
 after_success:
   - coveralls
+
+deploy:
+  provider: pypi
+  user: lnielsen
+  password:
+    secure: QxwAaTVisg9G5A2c2JGSDLhw5SBW+8VmJ7Tqdk+K+9mnqAVP7wFo6s6CvSkn6cKIaUjS+Zr688jRsSbrNqw2MimfKE2L7hnUuSM8WdoHhrnoYemIu4zJ7j2wnkz0Mvkkp8fyFuMkgpNu6prARrmBTBA+4FUuybY7XZTcyXUTdCpkbbwtdGbpYRnviLLvKG4tqxVXIcB93FltMmWPuKc37IHk+HMdr7+U0LwWyLjNc0ifB9kEq2dltjpldfNu5ZbRPv5LOkU49c7KZyNok16i4wIYweaOWOGhSE/vKVt4+oiCwHfZyvIYEs/t+RVaUlixRFwvVjkkkPhzlOuy0Vr9Z9z88vbvShgm0z5uMAaWEvarx3tWpMy2hLV7NZakyLSOoxIipHZr0sJDP08nURPaWJwHbxxKx5Qb3xr6F4rF0u85KvvWXLzWC0zS6wTNi+WIu2HqDGHko28cZwUO2I5ImERpHp8Gntpiw/C2aJvuiZ8ohyh6gqixEA7PSwwIzH8kdXyoZocJ48JnZtl8VLA3QkKv0jTPkargOgZ86ZlzsXJY2GFhYccupVaU+uNFuDFMWxDhhwyac3GAVtnzLdAKGTLHzqwfkDyaJDb2O0N8jd4LA+KCvSGs2z1DgMTXlwI40xrbYmuKnLkLSFdmWslIMJ2tfurxQBmka9sdF3cmAZE=
+  distributions: "sdist bdist_wheel"
+  on:
+    tags: true
+    python: "2.7"
+    condition: $REQUIREMENTS = release
