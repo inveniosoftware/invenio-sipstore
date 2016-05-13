@@ -2,7 +2,7 @@
  Invenio-SIPStore v1.0.0a1
 ===========================
 
-Invenio-SIPStore v1.0.0a1 was released on TBD, 2016.
+Invenio-SIPStore v1.0.0a1 was released on May 13, 2016.
 
 About
 -----
