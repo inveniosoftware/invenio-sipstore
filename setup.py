@@ -47,7 +47,7 @@ extras_require = {
         'Flask-Admin>=1.3.0',
     ],
     'docs': [
-        'Sphinx>=1.3',
+        'Sphinx>=1.4',
     ],
     'tests': tests_require,
 }
