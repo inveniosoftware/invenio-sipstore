@@ -29,3 +29,6 @@ SIPSTORE_DEFAULT_AGENT_JSONSCHEMA = 'sipstore/agent-v1.0.0.json'
 
 SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
 """Enable SIP agent validation by default."""
+
+SIPSTORE_FILEPATH_MAX_LEN = 1024
+"""Max filepath length."""

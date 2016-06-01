@@ -35,6 +35,8 @@ from invenio_files_rest.models import FileInstance
 from invenio_jsonschemas.errors import JSONSchemaNotFound
 from invenio_pidstore.models import PersistentIdentifier
 from jsonschema import validate
+from sqlalchemy.dialects import mysql
+from sqlalchemy.orm import validates
 from sqlalchemy_utils.models import Timestamp
 from sqlalchemy_utils.types import JSONType, UUIDType
 from werkzeug.local import LocalProxy
@@ -118,7 +120,8 @@ class SIPFile(db.Model, Timestamp):
     sip_id = db.Column(UUIDType, db.ForeignKey(SIP.id))
     """Id of SIP."""
 
-    filepath = db.Column(db.String(255), nullable=False)
+    filepath = db.Column(
+        db.Text().with_variant(mysql.VARCHAR(255), 'mysql'), nullable=False)
     """Filepath of submitted file within the SIP record."""
 
     file_id = db.Column(
@@ -127,6 +130,14 @@ class SIPFile(db.Model, Timestamp):
         primary_key=True,
         nullable=False)
     """Id of the FileInstance."""
+
+    @validates('filepath')
+    def validate_key(self, filepath, filepath_):
+        """Validate key."""
+        if len(filepath_) > current_app.config['SIPSTORE_FILEPATH_MAX_LEN']:
+            raise ValueError(
+                'Filepath too long ({0}).'.format(len(filepath_)))
+        return filepath_
 
     #
     # Relations
