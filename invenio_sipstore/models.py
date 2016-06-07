@@ -117,17 +117,17 @@ class SIPFile(db.Model, Timestamp):
 
     __tablename__ = 'sipstore_sipfile'
 
-    sip_id = db.Column(UUIDType, db.ForeignKey(SIP.id))
+    sip_id = db.Column(UUIDType, db.ForeignKey(SIP.id), primary_key=True)
     """Id of SIP."""
 
     filepath = db.Column(
-        db.Text().with_variant(mysql.VARCHAR(255), 'mysql'), nullable=False)
+        db.Text().with_variant(mysql.VARCHAR(255), 'mysql'), nullable=False,
+        primary_key=True)
     """Filepath of submitted file within the SIP record."""
 
     file_id = db.Column(
         UUIDType,
         db.ForeignKey(FileInstance.id, ondelete='RESTRICT'),
-        primary_key=True,
         nullable=False)
     """Id of the FileInstance."""
 
