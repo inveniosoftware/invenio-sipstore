@@ -29,7 +29,6 @@ from __future__ import absolute_import, print_function
 
 import pytest
 from invenio_accounts.testutils import create_test_user
-from invenio_files_rest.models import FileInstance
 from invenio_jsonschemas.errors import JSONSchemaNotFound
 from invenio_pidstore.models import PersistentIdentifier
 from jsonschema.exceptions import ValidationError
@@ -41,7 +40,6 @@ from invenio_sipstore.models import SIP, RecordSIP, SIPFile
 def test_sip_model(db):
     """Test the SIP model."""
     user1 = create_test_user('test@example.org')
-
     # Valid agent JSON
     agent1 = {'email': 'user@invenio.org', 'ip_address': '1.1.1.1'}
 
@@ -70,15 +68,8 @@ def test_sip_model(db):
     db.session.commit()
 
 
-def test_sip_file_model(db):
+def test_sip_file_model(db, sip_with_file):
     """Test the SIPFile model."""
-    sip1 = SIP.create('json', '{}')
-    file1 = FileInstance.create()
-    sipfile1 = SIPFile(sip_id=sip1.id, filepath="foobar.zip",
-                       file_id=file1.id)
-
-    db.session.add(sipfile1)
-    db.session.commit()
     assert SIP.query.count() == 1
     assert SIPFile.query.count() == 1
 
@@ -93,3 +84,14 @@ def test_record_sip_model(db):
     db.session.add(rsip1)
     db.session.commit()
     assert RecordSIP.query.count() == 1
+
+
+def test_sip_archive_uri_validation(db):
+    """Test the SIP archive_uri validation."""
+    def set_archive_uri(sip, archive_uri):
+        sip.archive_uri = archive_uri
+
+    sip = SIP.create('json', '{}')
+
+    set_archive_uri(sip, 'a' * 1024)
+    pytest.raises(ValueError, set_archive_uri, sip, 'a' * 1025)

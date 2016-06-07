@@ -34,6 +34,7 @@ history = open('CHANGES.rst').read()
 tests_require = [
     'check-manifest>=0.25',
     'coverage>=4.0',
+    'Flask-CeleryExt>=0.1.0',
     'isort>=4.2.2',
     'pydocstyle>=1.0.0',
     'pytest-cache>=1.0',
@@ -61,12 +62,13 @@ setup_requires = [
 ]
 
 install_requires = [
+    'Flask-BabelEx>=0.9.2',
     'Flask>=0.11.1',
     'invenio-db>=1.0.0a9',
     'invenio-accounts>=1.0.0a10',
     'invenio-pidstore>=1.0.0a7',
     'invenio-jsonschemas>=1.0.0a3',
-    'invenio-files-rest>=1.0.0a1',
+    'invenio-files-rest>=1.0.0a10',
     'jsonschema>=2.5.1',
 ]
 

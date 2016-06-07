@@ -33,13 +33,18 @@ import tempfile
 
 import pytest
 from flask import Flask
+from flask_celeryext import FlaskCeleryExt
 from invenio_accounts import InvenioAccounts
 from invenio_db import db as db_
 from invenio_db import InvenioDB
+from invenio_files_rest import InvenioFilesREST
+from invenio_files_rest.models import FileInstance, Location
 from invenio_jsonschemas import InvenioJSONSchemas
+from six import BytesIO, b
 from sqlalchemy_utils.functions import create_database, database_exists
 
 from invenio_sipstore import InvenioSIPStore
+from invenio_sipstore.models import SIP, SIPFile
 
 
 @pytest.yield_fixture(scope='session')
@@ -73,6 +78,7 @@ def app(instance_path, config):
     InvenioAccounts(app)
     InvenioJSONSchemas(app)
     InvenioSIPStore(app)
+    InvenioFilesREST(app)
 
     with app.app_context():
         yield app
@@ -87,3 +93,48 @@ def db(app):
     yield db_
     db_.session.remove()
     db_.drop_all()
+
+
+@pytest.fixture(scope='session')
+def task_app(app):
+    """Flask application with Celery enabled."""
+    FlaskCeleryExt(app)
+    return app
+
+
+@pytest.fixture
+def dummy_location(db, instance_path):
+    """File system location."""
+    loc = Location(
+        name='testloc',
+        uri=instance_path,
+        default=True
+    )
+    db.session.add(loc)
+    db.session.commit()
+
+    return loc
+
+
+@pytest.fixture
+def sip_with_file(dummy_location, db):
+    """Test the SIPFile model."""
+    sip = SIP.create('json', '{}')
+    file = FileInstance.create()
+    file.set_contents(BytesIO(b('test')), default_location=dummy_location.uri)
+    sipfile = SIPFile(sip_id=sip.id, filepath="foobar.txt", file_id=file.id)
+
+    db_.session.add(sipfile)
+    db_.session.commit()
+    return sip
+
+
+@pytest.yield_fixture()
+def tmp_archive_path_task(task_app):
+    """Fixture to check the BagIt file generation."""
+    tmp_path = tempfile.mkdtemp()
+    path_orig = task_app.config['SIPSTORE_ARCHIVE_BASEPATH']
+    task_app.config['SIPSTORE_ARCHIVE_BASEPATH'] = tmp_path
+    yield tmp_path
+    task_app.config['SIPSTORE_ARCHIVE_BASEPATH'] = path_orig
+    shutil.rmtree(tmp_path)

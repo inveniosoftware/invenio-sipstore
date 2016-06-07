@@ -32,3 +32,6 @@ SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
 
 SIPSTORE_FILEPATH_MAX_LEN = 1024
 """Max filepath length."""
+
+SIPSTORE_ARCHIVE_BASEPATH = 'basepath'
+"""Default base path used to generate the BagIt file."""

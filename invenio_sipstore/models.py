@@ -62,6 +62,21 @@ class SIP(db.Model, Timestamp):
     content = db.Column(db.Text, nullable=False)
     """Text blob of the SIP content."""
 
+    archived_at = db.Column(db.DateTime, default=None)
+    """SIP package generation date."""
+
+    archive_uri = db.Column(
+        db.Text().with_variant(mysql.VARCHAR(1024), 'mysql'))
+    """SIP package generation location."""
+
+    @validates('archive_uri')
+    def validate_archive_uri(self, archive_uri, archive_uri_):
+        """Validate archive_uri filed."""
+        if len(archive_uri_) > current_app.config['SIPSTORE_FILEPATH_MAX_LEN']:
+            raise ValueError(
+                'File path is too long ({0}).'.format(len(archive_uri_)))
+        return archive_uri
+
     user_id = db.Column(db.Integer,
                         db.ForeignKey(User.id),
                         nullable=True,
