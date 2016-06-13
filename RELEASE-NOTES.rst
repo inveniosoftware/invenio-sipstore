@@ -1,8 +1,8 @@
 ===========================
- Invenio-SIPStore v1.0.0a1
+ Invenio-SIPStore v1.0.0a2
 ===========================
 
-Invenio-SIPStore v1.0.0a1 was released on May 13, 2016.
+Invenio-SIPStore v1.0.0a2 was released on June 13, 2016.
 
 About
 -----
@@ -19,7 +19,7 @@ What's new
 Installation
 ------------
 
-   $ pip install invenio-sipstore==v1.0.0a1
+   $ pip install invenio-sipstore==v1.0.0a2
 
 Documentation
 -------------
