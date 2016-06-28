@@ -27,4 +27,4 @@ Authors
 
 Submission Information Package store for Invenio.
 
-- CERN <info@invenio-software.org>
+- CERN <info@inveniosoftware.org>
