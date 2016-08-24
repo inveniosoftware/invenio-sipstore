@@ -33,7 +33,6 @@ import tempfile
 
 import pytest
 from flask import Flask
-from flask_cli import FlaskCLI
 from invenio_accounts import InvenioAccounts
 from invenio_db import db as db_
 from invenio_db import InvenioDB
@@ -70,7 +69,6 @@ def app(instance_path, config):
     """Flask application fixture."""
     app = Flask('testapp', instance_path=instance_path)
     app.config.update(config)
-    FlaskCLI(app)
     InvenioDB(app)
     InvenioAccounts(app)
     InvenioJSONSchemas(app)
