@@ -57,13 +57,11 @@ for reqs in extras_require.values():
     extras_require['all'].extend(reqs)
 
 setup_requires = [
-    'Babel>=1.3',
     'pytest-runner>=2.6.2',
 ]
 
 install_requires = [
     'Flask>=0.11.1',
-    'Flask-BabelEx>=0.9.2',
     'invenio-db>=1.0.0a9',
     'invenio-accounts>=1.0.0a10',
     'invenio-pidstore>=1.0.0a7',
@@ -101,9 +99,6 @@ setup(
         ],
         'invenio_base.apps': [
             'invenio_sipstore = invenio_sipstore:InvenioSIPStore',
-        ],
-        'invenio_i18n.translations': [
-            'messages = invenio_sipstore',
         ],
         'invenio_jsonschemas.schemas': [
             'sipstore = invenio_sipstore.jsonschemas',
