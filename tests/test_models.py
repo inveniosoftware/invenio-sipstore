@@ -40,7 +40,7 @@ from invenio_sipstore.models import SIP, RecordSIP, SIPFile
 
 def test_sip_model(db):
     """Test the SIP model."""
-    user1 = create_test_user()
+    user1 = create_test_user('test@example.org')
 
     # Valid agent JSON
     agent1 = {'email': 'user@invenio.org', 'ip_address': '1.1.1.1'}
