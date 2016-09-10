@@ -78,7 +78,7 @@ class SIP(db.Model, Timestamp):
     """Relation to the User responsible for the SIP."""
 
     @classmethod
-    def create(cls, sip_format, content, user_id=None, agent=None):
+    def create(cls, sip_format, content, user_id=None, agent=None, id_=None):
         """Create a Submission Information Package object.
 
         :param sip_format: Format of the SIP content (e.g. 'json', 'marcxml').
@@ -106,8 +106,13 @@ class SIP(db.Model, Timestamp):
             validate(agent, schema)
 
         with db.session.begin_nested():
-            obj = cls(sip_format=sip_format, content=content, user_id=user_id,
-                      agent=agent)
+            obj = cls(
+                id=id_ or uuid.uuid4(),
+                sip_format=sip_format,
+                content=content,
+                user_id=user_id,
+                agent=agent
+            )
             db.session.add(obj)
         return obj
 
