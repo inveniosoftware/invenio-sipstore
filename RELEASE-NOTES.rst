@@ -24,7 +24,7 @@ Installation
 Documentation
 -------------
 
-   http://pythonhosted.org/invenio-sipstore/
+   http://invenio-sipstore.readthedocs.io/
 
 Happy hacking and thanks for flying Invenio-SIPStore.
 
