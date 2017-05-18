@@ -35,7 +35,7 @@ from invenio_pidstore.models import PersistentIdentifier
 from jsonschema.exceptions import ValidationError
 
 from invenio_sipstore.errors import SIPUserDoesNotExist
-from invenio_sipstore.models import SIP, RecordSIP, SIPFile
+from invenio_sipstore.models import SIP, RecordSIP, SIPFile, SIPMetadata
 
 
 def test_sip_model(db):
@@ -56,23 +56,22 @@ def test_sip_model(db):
         'ip_address': '1.1.1.1',
         '$schema': 'http://incorrect/agent/schema.json',
     }
-    sip1 = SIP.create('json', '{"foo": "bar"}', user_id=user1.id,
-                      agent=agent1)
+    sip1 = SIP.create(user_id=user1.id, agent=agent1)
     assert sip1.user == user1
 
-    SIP.create('marcxml', '<foo>bar</foo>')
-    SIP.create('json', '{}', user_id=user1.id, agent=agent1)
+    SIP.create()
+    SIP.create(user_id=user1.id, agent=agent1)
     assert SIP.query.count() == 3
 
-    pytest.raises(ValidationError, SIP.create, 'json', '{}', agent=agent2)
-    pytest.raises(SIPUserDoesNotExist, SIP.create, 'json', '{}', user_id=5)
-    pytest.raises(JSONSchemaNotFound, SIP.create, 'json', '', agent=agent3)
+    pytest.raises(ValidationError, SIP.create, agent=agent2)
+    pytest.raises(SIPUserDoesNotExist, SIP.create, user_id=5)
+    pytest.raises(JSONSchemaNotFound, SIP.create, agent=agent3)
     db.session.commit()
 
 
 def test_sip_file_model(db):
     """Test the SIPFile model."""
-    sip1 = SIP.create('json', '{}')
+    sip1 = SIP.create()
     file1 = FileInstance.create()
     sipfile1 = SIPFile(sip_id=sip1.id, filepath="foobar.zip",
                        file_id=file1.id)
@@ -83,9 +82,25 @@ def test_sip_file_model(db):
     assert SIPFile.query.count() == 1
 
 
+def test_sip_metadata_model(db):
+    """Test the SIPMetadata model."""
+    sip1 = SIP.create()
+    metadata1 = '{"title": "great book"}'
+    sipmetadata = SIPMetadata(sip_id=sip1.id, content=metadata1,
+                              format='json')
+    db.session.add(sipmetadata)
+    db.session.commit()
+    assert SIP.query.count() == 1
+    assert SIPMetadata.query.count() == 1
+    sipmetadata = SIPMetadata.query.one()
+    assert sipmetadata.content == metadata1
+    assert sipmetadata.format == 'json'
+    assert sipmetadata.sip.id == sip1.id
+
+
 def test_record_sip_model(db):
     """Test the RecordSIP model."""
-    sip1 = SIP.create('json', '{}')
+    sip1 = SIP.create()
     db.session.commit()
     pid1 = PersistentIdentifier.create('recid', '12345')
 

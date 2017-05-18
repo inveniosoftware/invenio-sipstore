@@ -33,18 +33,15 @@ class SIPModelView(ModelView):
     can_view_details = True
     column_display_all_relations = True
     column_list = (
-        'sip_format', 'content', 'user_id', 'agent'
+        'user_id', 'agent'
     )
     column_labels = dict(
-        sip_format='SIP Format',
-        content='Content',
         user_id='User ID',
         agent='Agent'
     )
     column_filters = (
-        'sip_format', 'content', 'user_id',
+        'user_id',
     )
-    column_searchable_list = ('sip_format', 'content')
     page_size = 25
 
 
