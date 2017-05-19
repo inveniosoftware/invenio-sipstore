@@ -110,6 +110,8 @@ setup(
             'invenio_sipstore_sip = invenio_sipstore.admin:sip_adminview',
             'invenio_sipstore_sipfile = '
             'invenio_sipstore.admin:sipfile_adminview',
+            'invenio_sipstore_sipmetadata = '
+            'invenio_sipstore.admin:sipmetadata_adminview',
             'invenio_sipstore_recordsip = '
             'invenio_sipstore.admin:recordsip_adminview',
         ]
