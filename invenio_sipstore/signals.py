@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016 CERN.
+# Copyright (C) 2017 CERN.
 #
 # Invenio is free software; you can redistribute it
 # and/or modify it under the terms of the GNU General Public License as
@@ -22,23 +22,26 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-"""Default configuration of Invenio-SIPStore module."""
+"""Signals for the module."""
 
-SIPSTORE_DEFAULT_AGENT_JSONSCHEMA = 'sipstore/agent-v1.0.0.json'
-"""Default JSON schema for extra SIP agent information.
+from blinker import Namespace
 
-For more examples, you can have a look at Zenodo's config:
-https://github.com/zenodo/zenodo/tree/master/zenodo/modules/sipstore/jsonschemas/sipstore
+_signals = Namespace()
+
+sipstore_created = _signals.signal('sipstore_created')
+"""Signal sent each time a SIP has been created.
+
+Send the SIP as a parameter: :py:class:`invenio_sipstore.api.SIP`
+
+Example subscriber
+
+.. code-block:: python
+
+    def listener(sender, *args, **kwargs):
+        # sender is the SIP being archived
+        for f in sender.files:
+            print(f.filepath)
+
+    from invenio_sipstore.signals import sipstore_created
+    sipstore_created.connect(listener)
 """
-
-SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
-"""Enable SIP agent validation by default."""
-
-SIPSTORE_AGENT_FACTORY = 'invenio_sipstore.api.SIP._build_agent_info'
-"""Factory to build the agent, stored for the information about the SIP."""
-
-SIPSTORE_FILEPATH_MAX_LEN = 1024
-"""Max filepath length."""
-
-SIPSTORE_ARCHIVE_BASEPATH = 'basepath'
-"""Default base path used to generate the BagIt file."""

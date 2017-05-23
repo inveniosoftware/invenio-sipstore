@@ -67,13 +67,13 @@ class SIP(db.Model, Timestamp):
     """Agent information regarding given SIP."""
 
     archivable = db.Column(
-        db.Boolean(name='ck_sip_archivable'),
+        db.Boolean(name='ck_sipstore_archivable'),
         nullable=False,
         default=True)
     """Boolean stating if the SIP should be archived or not."""
 
     archived = db.Column(
-        db.Boolean(name='ck_sip_archived'),
+        db.Boolean(name='ck_sipstore_archived'),
         nullable=False,
         default=False)
     """Boolean stating if the SIP has been archived or not."""
@@ -145,6 +145,11 @@ class SIPFile(db.Model, Timestamp):
                       ondelete='RESTRICT'),
         nullable=False)
     """Id of the FileInstance."""
+
+    @property
+    def storage_location(self):
+        """Return the location of the file in the current storage."""
+        return self.file.uri
 
     @validates('filepath')
     def validate_key(self, filepath, filepath_):
