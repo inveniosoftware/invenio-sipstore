@@ -36,8 +36,10 @@ from flask import Flask
 from invenio_accounts import InvenioAccounts
 from invenio_db import db as db_
 from invenio_db import InvenioDB
+from invenio_files_rest import InvenioFilesREST
 from invenio_jsonschemas import InvenioJSONSchemas
-from sqlalchemy_utils.functions import create_database, database_exists
+from sqlalchemy_utils.functions import create_database, database_exists, \
+    drop_database
 
 from invenio_sipstore import InvenioSIPStore
 
@@ -46,39 +48,37 @@ from invenio_sipstore import InvenioSIPStore
 def instance_path():
     """Default instance path."""
     path = tempfile.mkdtemp()
-
     yield path
-
     shutil.rmtree(path)
 
 
-@pytest.fixture(scope='session')
-def config():
-    """Default configuration."""
-    return dict(
+@pytest.fixture()
+def base_app(instance_path):
+    """Flask application fixture."""
+    app = Flask('testapp', instance_path=instance_path)
+    app.config.update(
         TESTING=True,
         SECRET_KEY='CHANGE_ME',
         SECURITY_PASSWORD_SALT='CHANGE_ME',
         SQLALCHEMY_DATABASE_URI=os.environ.get(
-            'SQLALCHEMY_DATABASE_URI', 'sqlite://'),
+            'SQLALCHEMY_DATABASE_URI', 'sqlite:///test.db'),
     )
-
-
-@pytest.yield_fixture(scope='session')
-def app(instance_path, config):
-    """Flask application fixture."""
-    app = Flask('testapp', instance_path=instance_path)
-    app.config.update(config)
-    InvenioDB(app)
-    InvenioAccounts(app)
-    InvenioJSONSchemas(app)
     InvenioSIPStore(app)
-
-    with app.app_context():
-        yield app
+    return app
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.yield_fixture()
+def app(base_app):
+    """Flask application fixture."""
+    InvenioDB(base_app)
+    InvenioAccounts(base_app)
+    InvenioFilesREST(base_app)
+    InvenioJSONSchemas(base_app)
+    with base_app.app_context():
+        yield base_app
+
+
+@pytest.yield_fixture()
 def db(app):
     """Setup database."""
     if not database_exists(str(db_.engine.url)):
@@ -87,3 +87,4 @@ def db(app):
     yield db_
     db_.session.remove()
     db_.drop_all()
+    drop_database(str(db_.engine.url))

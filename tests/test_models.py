@@ -27,12 +27,16 @@
 
 from __future__ import absolute_import, print_function
 
+import tempfile
+from shutil import rmtree
+
 import pytest
 from invenio_accounts.testutils import create_test_user
-from invenio_files_rest.models import FileInstance
+from invenio_files_rest.models import Bucket, FileInstance, Location
 from invenio_jsonschemas.errors import JSONSchemaNotFound
 from invenio_pidstore.models import PersistentIdentifier
 from jsonschema.exceptions import ValidationError
+from six import BytesIO
 
 from invenio_sipstore.errors import SIPUserDoesNotExist
 from invenio_sipstore.models import SIP, RecordSIP, SIPFile, SIPMetadata
@@ -69,17 +73,54 @@ def test_sip_model(db):
     db.session.commit()
 
 
-def test_sip_file_model(db):
+def test_sip_file_model(app, db):
     """Test the SIPFile model."""
+    # change default settings
+    app.config['SIPSTORE_FILEPATH_MAX_LEN'] = 15
+    # create sipfiles
     sip1 = SIP.create()
     file1 = FileInstance.create()
     sipfile1 = SIPFile(sip_id=sip1.id, filepath="foobar.zip",
                        file_id=file1.id)
-
+    with pytest.raises(ValueError) as excinfo:
+        sipfile2 = SIPFile(sip_id=sip1.id,
+                           filepath="way too long file name.zip",
+                           file_id=file1.id)
+    assert 'Filepath too long' in str(excinfo.value)
     db.session.add(sipfile1)
     db.session.commit()
+    # tests
     assert SIP.query.count() == 1
     assert SIPFile.query.count() == 1
+
+
+def test_sip_file_storage_location(db):
+    """Test the storage_location SIPFile member."""
+    # we setup a file storage
+    tmppath = tempfile.mkdtemp()
+    db.session.add(Location(name='default', uri=tmppath, default=True))
+    db.session.commit()
+    # we create a file
+    content = b'test file\n'
+    bucket = Bucket.create()
+    file1 = FileInstance.create()
+    file1.set_contents(
+        BytesIO(content), size=len(content),
+        default_location=bucket.location.uri,
+        default_storage_class=bucket.default_storage_class
+    )
+    # we insert it in a sipfile
+    sip1 = SIP.create()
+    sipfile1 = SIPFile(sip_id=sip1.id, filepath='test.txt',
+                       file_id=file1.id)
+    db.session.add(sipfile1)
+    db.session.commit()
+    assert sipfile1.filepath == 'test.txt'
+    assert sipfile1.storage_location.startswith(tmppath)
+    with open(sipfile1.storage_location, "rb") as f:
+        assert f.read() == content
+    # finalization
+    rmtree(tmppath)
 
 
 def test_sip_metadata_model(db):
