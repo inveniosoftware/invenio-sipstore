@@ -27,15 +27,19 @@
 
 from __future__ import absolute_import, print_function
 
+import tempfile
+from shutil import rmtree
+
 import pytest
 from invenio_accounts.testutils import create_test_user
-from invenio_files_rest.models import FileInstance
+from invenio_files_rest.models import Bucket, FileInstance, Location
 from invenio_jsonschemas.errors import JSONSchemaNotFound
 from invenio_pidstore.models import PersistentIdentifier
 from jsonschema.exceptions import ValidationError
+from six import BytesIO
 
 from invenio_sipstore.errors import SIPUserDoesNotExist
-from invenio_sipstore.models import SIP, RecordSIP, SIPFile
+from invenio_sipstore.models import SIP, RecordSIP, SIPFile, SIPMetadata
 
 
 def test_sip_model(db):
@@ -56,36 +60,88 @@ def test_sip_model(db):
         'ip_address': '1.1.1.1',
         '$schema': 'http://incorrect/agent/schema.json',
     }
-    sip1 = SIP.create('json', '{"foo": "bar"}', user_id=user1.id,
-                      agent=agent1)
+    sip1 = SIP.create(user_id=user1.id, agent=agent1)
     assert sip1.user == user1
 
-    SIP.create('marcxml', '<foo>bar</foo>')
-    SIP.create('json', '{}', user_id=user1.id, agent=agent1)
+    SIP.create()
+    SIP.create(user_id=user1.id, agent=agent1)
     assert SIP.query.count() == 3
 
-    pytest.raises(ValidationError, SIP.create, 'json', '{}', agent=agent2)
-    pytest.raises(SIPUserDoesNotExist, SIP.create, 'json', '{}', user_id=5)
-    pytest.raises(JSONSchemaNotFound, SIP.create, 'json', '', agent=agent3)
+    pytest.raises(ValidationError, SIP.create, agent=agent2)
+    pytest.raises(SIPUserDoesNotExist, SIP.create, user_id=5)
+    pytest.raises(JSONSchemaNotFound, SIP.create, agent=agent3)
     db.session.commit()
 
 
-def test_sip_file_model(db):
+def test_sip_file_model(app, db):
     """Test the SIPFile model."""
-    sip1 = SIP.create('json', '{}')
+    # change default settings
+    app.config['SIPSTORE_FILEPATH_MAX_LEN'] = 15
+    # create sipfiles
+    sip1 = SIP.create()
     file1 = FileInstance.create()
     sipfile1 = SIPFile(sip_id=sip1.id, filepath="foobar.zip",
                        file_id=file1.id)
-
+    with pytest.raises(ValueError) as excinfo:
+        sipfile2 = SIPFile(sip_id=sip1.id,
+                           filepath="way too long file name.zip",
+                           file_id=file1.id)
+    assert 'Filepath too long' in str(excinfo.value)
     db.session.add(sipfile1)
     db.session.commit()
+    # tests
     assert SIP.query.count() == 1
     assert SIPFile.query.count() == 1
 
 
+def test_sip_file_storage_location(db):
+    """Test the storage_location SIPFile member."""
+    # we setup a file storage
+    tmppath = tempfile.mkdtemp()
+    db.session.add(Location(name='default', uri=tmppath, default=True))
+    db.session.commit()
+    # we create a file
+    content = b'test file\n'
+    bucket = Bucket.create()
+    file1 = FileInstance.create()
+    file1.set_contents(
+        BytesIO(content), size=len(content),
+        default_location=bucket.location.uri,
+        default_storage_class=bucket.default_storage_class
+    )
+    # we insert it in a sipfile
+    sip1 = SIP.create()
+    sipfile1 = SIPFile(sip_id=sip1.id, filepath='test.txt',
+                       file_id=file1.id)
+    db.session.add(sipfile1)
+    db.session.commit()
+    assert sipfile1.filepath == 'test.txt'
+    assert sipfile1.storage_location.startswith(tmppath)
+    with open(sipfile1.storage_location, "rb") as f:
+        assert f.read() == content
+    # finalization
+    rmtree(tmppath)
+
+
+def test_sip_metadata_model(db):
+    """Test the SIPMetadata model."""
+    sip1 = SIP.create()
+    metadata1 = '{"title": "great book"}'
+    sipmetadata = SIPMetadata(sip_id=sip1.id, content=metadata1,
+                              format='json')
+    db.session.add(sipmetadata)
+    db.session.commit()
+    assert SIP.query.count() == 1
+    assert SIPMetadata.query.count() == 1
+    sipmetadata = SIPMetadata.query.one()
+    assert sipmetadata.content == metadata1
+    assert sipmetadata.format == 'json'
+    assert sipmetadata.sip.id == sip1.id
+
+
 def test_record_sip_model(db):
     """Test the RecordSIP model."""
-    sip1 = SIP.create('json', '{}')
+    sip1 = SIP.create()
     db.session.commit()
     pid1 = PersistentIdentifier.create('recid', '12345')
 

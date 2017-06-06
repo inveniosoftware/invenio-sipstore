@@ -34,10 +34,12 @@ history = open('CHANGES.rst').read()
 tests_require = [
     'check-manifest>=0.25',
     'coverage>=4.0',
+    'invenio-records-files>=1.0.0a9',
     'isort>=4.2.2',
     'pydocstyle>=1.0.0',
     'pytest-cache>=1.0',
     'pytest-cov>=1.8.0',
+    'pytest-mock>=1.6.0',
     'pytest-pep8>=1.0.6',
     'pytest>=2.8.0',
 ]
@@ -66,7 +68,7 @@ install_requires = [
     'invenio-accounts>=1.0.0a10',
     'invenio-pidstore>=1.0.0a7',
     'invenio-jsonschemas>=1.0.0a3',
-    'invenio-files-rest>=1.0.0a1',
+    'invenio-files-rest>=1.0.0a14',
     'jsonschema>=2.5.1',
 ]
 
@@ -107,6 +109,8 @@ setup(
             'invenio_sipstore_sip = invenio_sipstore.admin:sip_adminview',
             'invenio_sipstore_sipfile = '
             'invenio_sipstore.admin:sipfile_adminview',
+            'invenio_sipstore_sipmetadata = '
+            'invenio_sipstore.admin:sipmetadata_adminview',
             'invenio_sipstore_recordsip = '
             'invenio_sipstore.admin:recordsip_adminview',
         ]

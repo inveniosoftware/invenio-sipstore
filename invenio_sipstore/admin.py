@@ -21,7 +21,7 @@
 
 from flask_admin.contrib.sqla import ModelView
 
-from .models import SIP, RecordSIP, SIPFile
+from .models import SIP, RecordSIP, SIPFile, SIPMetadata
 
 
 class SIPModelView(ModelView):
@@ -33,18 +33,17 @@ class SIPModelView(ModelView):
     can_view_details = True
     column_display_all_relations = True
     column_list = (
-        'sip_format', 'content', 'user_id', 'agent'
+        'user_id', 'agent', 'archivable', 'archived'
     )
     column_labels = dict(
-        sip_format='SIP Format',
-        content='Content',
         user_id='User ID',
-        agent='Agent'
+        agent='Agent',
+        archivable='Archivable',
+        archived='Archived'
     )
     column_filters = (
-        'sip_format', 'content', 'user_id',
+        'user_id', 'archivable', 'archived'
     )
-    column_searchable_list = ('sip_format', 'content')
     page_size = 25
 
 
@@ -55,6 +54,31 @@ class SIPFileModelView(ModelView):
     can_edit = False
     can_delete = False
     can_view_details = True
+    page_size = 25
+
+
+class SIPMetadataModelView(ModelView):
+    """ModelView for the SIPMetadata."""
+
+    can_create = False
+    can_edit = False
+    can_delete = False
+    can_view_details = True
+    column_display_all_relations = True
+    column_list = (
+        'format',
+        'content',
+        'sip.agent',
+        'sip.archivable',
+        'sip.archived'
+    )
+    column_labels = {
+        'format': 'Format',
+        'content': 'Content',
+        'sip.agent': 'Agent',
+        'sip.archivable': 'Archivable',
+        'sip.archived': 'Archived'
+    }
     page_size = 25
 
 
@@ -77,6 +101,11 @@ sipfile_adminview = dict(
     modelview=SIPFileModelView,
     model=SIPFile,
     name='SIPFile',
+    category='Records')
+sipmetadata_adminview = dict(
+    modelview=SIPMetadataModelView,
+    model=SIPMetadata,
+    name='SIPMetadata',
     category='Records')
 recordsip_adminview = dict(
     modelview=RecordSIPModelView,
