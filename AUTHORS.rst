@@ -28,3 +28,4 @@ Authors
 Submission Information Package store for Invenio.
 
 - CERN <info@inveniosoftware.org>
+- Rémi Ducceschi <remi.ducceschi@gmail.com>

@@ -64,6 +64,9 @@ def test_SIP(db):
     db.session.commit()
     assert api_sip.archived is True
     assert sip.archived is True
+    # test of the get method
+    api_sip2 = SIP.get_sip(sip.id)
+    assert api_sip2.id == api_sip.id
 
 
 def test_SIP_files(db):

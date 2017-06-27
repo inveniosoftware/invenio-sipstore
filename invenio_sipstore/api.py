@@ -186,6 +186,11 @@ class SIP(object):
         sipstore_created.send(sip)
         return sip
 
+    @classmethod
+    def get_sip(cls, uuid):
+        """Get a SIP API object from the UUID if a model object."""
+        return cls(SIP_.query.filter_by(id=uuid).one())
+
 
 class RecordSIP(object):
     """API for managing SIPRecords."""

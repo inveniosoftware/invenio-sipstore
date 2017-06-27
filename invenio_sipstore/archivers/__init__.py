@@ -22,20 +22,9 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-"""Default configuration of Invenio-SIPStore module."""
+"""Archivers for SIPStore module."""
 
-SIPSTORE_DEFAULT_AGENT_JSONSCHEMA = 'sipstore/agent-v1.0.0.json'
-"""Default JSON schema for extra SIP agent information.
+from __future__ import absolute_import, print_function
 
-For more examples, you can have a look at Zenodo's config:
-https://github.com/zenodo/zenodo/tree/master/zenodo/modules/sipstore/jsonschemas/sipstore
-"""
-
-SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
-"""Enable SIP agent validation by default."""
-
-SIPSTORE_AGENT_FACTORY = 'invenio_sipstore.api.SIP._build_agent_info'
-"""Factory to build the agent, stored for the information about the SIP."""
-
-SIPSTORE_FILEPATH_MAX_LEN = 1024
-"""Max filepath length."""
+from .base_archiver import BaseArchiver
+from .bagit_archiver import BagItArchiver

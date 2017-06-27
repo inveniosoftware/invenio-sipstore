@@ -147,6 +147,16 @@ class SIPFile(db.Model, Timestamp):
     """Id of the FileInstance."""
 
     @property
+    def checksum(self):
+        """Return the checksum of the file."""
+        return self.file.checksum
+
+    @property
+    def size(self):
+        """Return the size of the file."""
+        return self.file.size
+
+    @property
     def storage_location(self):
         """Return the location of the file in the current storage."""
         return self.file.uri

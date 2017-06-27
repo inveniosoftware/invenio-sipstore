@@ -33,11 +33,14 @@ import tempfile
 
 import pytest
 from flask import Flask
+from fs.opener import opener
 from invenio_accounts import InvenioAccounts
 from invenio_db import db as db_
 from invenio_db import InvenioDB
 from invenio_files_rest import InvenioFilesREST
+from invenio_files_rest.models import FileInstance, Location
 from invenio_jsonschemas import InvenioJSONSchemas
+from six import BytesIO
 from sqlalchemy_utils.functions import create_database, database_exists, \
     drop_database
 
@@ -92,3 +95,38 @@ def db(app):
     db_.drop_all()
     drop_database(str(db_.engine.url))
 
+
+@pytest.fixture()
+def dummy_location(db, instance_path):
+    """File system location."""
+    loc = Location(
+        name='testloc',
+        uri=instance_path,
+        default=True
+    )
+    db.session.add(loc)
+    db.session.commit()
+    return loc
+
+
+@pytest.fixture()
+def sip_with_file(dummy_location, db):
+    """Test the SIPFile model."""
+    sip = SIP.create()
+    file = FileInstance.create()
+    file.set_contents(BytesIO(b'test'), default_location=dummy_location.uri)
+    sipfile = SIPFile(sip_id=sip.id, filepath="foobar.txt", file_id=file.id)
+
+    db_.session.add(sipfile)
+    db_.session.commit()
+    return sip
+
+
+@pytest.yield_fixture()
+def tmp_archive_fs():
+    """Fixture to check the BagIt file generation."""
+    tmp_path = tempfile.mkdtemp()
+    fs, path = opener.parse(tmp_path, writeable=True, create_dir=True)
+    fs = fs.opendir(path)
+    yield fs
+    shutil.rmtree(tmp_path)
