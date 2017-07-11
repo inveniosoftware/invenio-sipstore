@@ -28,3 +28,35 @@ API Docs
 invenio_sipstore
 ----------------
 
+.. automodule:: invenio_sipstore.ext
+   :members:
+
+API
+---
+
+.. automodule:: invenio_sipstore.api
+    :members:
+
+Models
+------
+
+.. automodule:: invenio_sipstore.models
+    :members:
+
+Archivers
+---------
+
+.. automodule:: invenio_sipstore.archivers
+    :members:
+
+BaseArchiver
+++++++++++++
+
+.. automodule:: invenio_sipstore.archivers.base_archiver
+    :members:
+
+BagItArchiver
++++++++++++++
+
+.. automodule:: invenio_sipstore.archivers.bagit_archiver
+    :members:

@@ -22,7 +22,17 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-"""Archivers for SIPStore module."""
+"""Archivers for SIPStore module.
+
+An archiver is an object used to manipulate SIPs. With an archiver, you can
+get the list of files contained in a SIP, their content...
+
+You can also write the SIP to disk thanks to its methods ``init``, ``create``
+and ``finalize``.
+
+The default archiver is the ``BaseArchiver`` that simply contains the files and
+the metadata.
+"""
 
 from __future__ import absolute_import, print_function
 

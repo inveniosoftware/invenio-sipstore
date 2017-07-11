@@ -28,7 +28,7 @@ from __future__ import absolute_import, print_function
 from flask_admin import Admin, menu
 
 from invenio_sipstore.admin import recordsip_adminview, sip_adminview, \
-    sipfile_adminview, sipmetadata_adminview
+    sipfile_adminview, sipmetadata_adminview, sipmetadatatype_adminview
 
 
 def test_admin(db, app):
@@ -37,7 +37,7 @@ def test_admin(db, app):
 
     # Register models in admin
     for adminview in (sip_adminview, sipfile_adminview, recordsip_adminview,
-                      sipmetadata_adminview):
+                      sipmetadata_adminview, sipmetadatatype_adminview):
         assert 'model' in adminview
         assert 'modelview' in adminview
         admin_kwargs = dict(adminview)
@@ -60,7 +60,9 @@ def test_admin(db, app):
     assert 'RecordSIP' in submenu_items
     assert 'SIPFile' in submenu_items
     assert 'SIPMetadata' in submenu_items
+    assert 'SIPMetadataType' in submenu_items
     assert isinstance(submenu_items['SIP'], menu.MenuView)
     assert isinstance(submenu_items['RecordSIP'], menu.MenuView)
     assert isinstance(submenu_items['SIPFile'], menu.MenuView)
     assert isinstance(submenu_items['SIPMetadata'], menu.MenuView)
+    assert isinstance(submenu_items['SIPMetadataType'], menu.MenuView)

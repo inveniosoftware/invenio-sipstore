@@ -21,7 +21,7 @@
 
 from flask_admin.contrib.sqla import ModelView
 
-from .models import SIP, RecordSIP, SIPFile, SIPMetadata
+from .models import SIP, RecordSIP, SIPFile, SIPMetadata, SIPMetadataType
 
 
 class SIPModelView(ModelView):
@@ -66,19 +66,30 @@ class SIPMetadataModelView(ModelView):
     can_view_details = True
     column_display_all_relations = True
     column_list = (
-        'format',
+        'type.name',
         'content',
         'sip.agent',
         'sip.archivable',
         'sip.archived'
     )
     column_labels = {
-        'format': 'Format',
+        'type.name': 'Type',
         'content': 'Content',
         'sip.agent': 'Agent',
         'sip.archivable': 'Archivable',
         'sip.archived': 'Archived'
     }
+    page_size = 25
+
+
+class SIPMetadataTypeModelView(ModelView):
+    """ModelView for the SIPMetadataType."""
+
+    can_create = True
+    can_edit = True
+    can_delete = False
+    can_view_details = True
+    column_display_all_relations = True
     page_size = 25
 
 
@@ -106,6 +117,11 @@ sipmetadata_adminview = dict(
     modelview=SIPMetadataModelView,
     model=SIPMetadata,
     name='SIPMetadata',
+    category='Records')
+sipmetadatatype_adminview = dict(
+    modelview=SIPMetadataTypeModelView,
+    model=SIPMetadataType,
+    name='SIPMetadataType',
     category='Records')
 recordsip_adminview = dict(
     modelview=RecordSIPModelView,

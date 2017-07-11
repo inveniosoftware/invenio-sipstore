@@ -40,9 +40,9 @@ class BaseArchiver(object):
     getters, or generate the archive in a given folder via the following
     methods:
 
-    - :py:func:`invenio_sipstore.archivers.BaseArchiver.init`
-    - :py:func:`invenio_sipstore.archivers.BaseArchiver.create`
-    - :py:func:`invenio_sipstore.archivers.BaseArchiver.finalize`
+    - :func:`invenio_sipstore.archivers.base_archiver.BaseArchiver.init`
+    - :func:`invenio_sipstore.archivers.base_archiver.BaseArchiver.create`
+    - :func:`invenio_sipstore.archivers.base_archiver.BaseArchiver.finalize`
     """
 
     def __init__(self, sip):
@@ -59,7 +59,7 @@ class BaseArchiver(object):
         """Return all the files in the archive, but not the metadata.
 
         :return: a dict with final relative path as keys and current location
-        in Invenio as value
+            in Invenio as value
         :rtype: dict
         """
         return {f.filepath: f.storage_location
@@ -71,12 +71,7 @@ class BaseArchiver(object):
         :return: a dict with final relative path as keys and content as value.
         :rtype: dict
         """
-        def get_extension(format):
-            if 'xml' in format:
-                return '.xml'
-            return '.json'
-
-        return {'metadata' + get_extention(m.format): m.content
+        return {m.type.name + '.' + m.type.format: m.content
                 for m in self.sip.metadata}
 
     def get_all_files(self):
@@ -84,8 +79,8 @@ class BaseArchiver(object):
 
         All the files + all the metadata + some other files specific to the
         archive type if necessary.
+
         :return: the list of all relative final path
-        :rtype: list
         """
         return list(self.get_files()) + list(self.get_metadata())
 
@@ -104,9 +99,9 @@ class BaseArchiver(object):
 
         :param str filesdir: the directory where to put files if necessary
         :param str metadatadir: the directory where to put metadata if
-        necessary
+            necessary
         :returns: a dictionnary with the filenames as keys, and size and
-        checksum as value
+            checksum as value
         :rtype: dict
         """
         files_info = self._copy_files(self.sip.files, filesdir)
@@ -137,11 +132,12 @@ class BaseArchiver(object):
         """Copy the files inside the new storage.
 
         Takes care of adding self.path at the beginning.
+
         :param files: the list of files to copy
         :type files: list(:py:class:`invenio_sipstore.models.SIPFile`)
         :param str filesdir: the directory where to copy files
         :returns: a dictionnary with the filenames as keys, and size and
-        checksum as value
+            checksum as value
         :rtype: dict
         """
         result = {}
@@ -176,10 +172,11 @@ class BaseArchiver(object):
         """Save the content inside the file.
 
         Takes care of adding self.path in the filename.
+
         :param str filename: the name of the file
         :param str content: the content of the file
         :returns: a dictionnary with the filenames as keys, and size and
-        checksum as value
+            checksum as value
         :rtype: dict
 
         ..warning::

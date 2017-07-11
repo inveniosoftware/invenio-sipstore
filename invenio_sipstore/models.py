@@ -67,13 +67,13 @@ class SIP(db.Model, Timestamp):
     """Agent information regarding given SIP."""
 
     archivable = db.Column(
-        db.Boolean(name='ck_sipstore_archivable'),
+        db.Boolean(name='archivable'),
         nullable=False,
         default=True)
     """Boolean stating if the SIP should be archived or not."""
 
     archived = db.Column(
-        db.Boolean(name='ck_sipstore_archived'),
+        db.Boolean(name='archived'),
         nullable=False,
         default=False)
     """Boolean stating if the SIP has been archived or not."""
@@ -180,20 +180,64 @@ class SIPFile(db.Model, Timestamp):
     """Relation to the SIP along which given file was submitted."""
 
 
+class SIPMetadataType(db.Model):
+    """Type of the metadata added to an SIP.
+
+    The type describes the type of file along with an eventual schema used to
+    validate the structure of the content.
+    """
+
+    __tablename__ = 'sipstore_sipmetadatatype'
+
+    id = db.Column(db.Integer(), primary_key=True)
+    """ID of the SIPMetadataType object."""
+
+    title = db.Column(db.String(255), nullable=False, unique=True)
+    """The title of type of metadata (i.e. 'Invenio JSON Record v1.0.0')."""
+
+    name = db.Column(db.String(255), nullable=False)
+    """The name used to create a file when we export the metadata."""
+
+    format = db.Column(db.String(255), nullable=False)
+    """The format of the metadata (xml, json, txt...).
+
+    This is used as the extension of the created file during an export.
+    """
+
+    schema = db.Column(db.String(1024), nullable=True, unique=True)
+    """URI to a schema that describes the metadata (json or xml schema)."""
+
+    @classmethod
+    def get(cls, id):
+        """Return the corresponding SIPMetadataType."""
+        return cls.query.filter_by(id=id).one()
+
+    @classmethod
+    def get_from_title(cls, title):
+        """Return the corresponding SIPMetadataType."""
+        return cls.query.filter_by(title=title).one()
+
+    @classmethod
+    def get_from_schema(cls, schema):
+        """Return the corresponding SIPMetadataType."""
+        return cls.query.filter_by(schema=schema).one()
+
+
 class SIPMetadata(db.Model, Timestamp):
     """Extra SIP info regarding metadata."""
 
     __tablename__ = 'sipstore_sipmetadata'
 
-    id = db.Column(UUIDType, primary_key=True, default=uuid.uuid4)
-    """Id of metadata."""
-
     sip_id = db.Column(UUIDType,
-                       db.ForeignKey(SIP.id, name='fk_sipmetadata_sip_id'))
+                       db.ForeignKey(SIP.id, name='fk_sipmetadata_sip_id'),
+                       primary_key=True)
     """Id of SIP."""
 
-    format = db.Column(db.String(7), nullable=False)
-    """Format of the metadata content ('json', 'marcxml' etc.)"""
+    type_id = db.Column(db.Integer(),
+                        db.ForeignKey(SIPMetadataType.id,
+                                      name='fk_sipmetadatatype_type'),
+                        primary_key=True)
+    """ID of the metadata type."""
 
     content = db.Column(db.Text, nullable=False)
     """Text blob of the metadata content."""
@@ -203,6 +247,9 @@ class SIPMetadata(db.Model, Timestamp):
     #
     sip = db.relationship(SIP, backref='sip_metadata', foreign_keys=[sip_id])
     """Relation to the SIP along which given metadata was submitted."""
+
+    type = db.relationship(SIPMetadataType)
+    """Relation to the SIPMetadataType."""
 
 
 class RecordSIP(db.Model, Timestamp):

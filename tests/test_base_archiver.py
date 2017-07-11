@@ -30,6 +30,7 @@ from hashlib import md5
 
 from invenio_sipstore.api import SIP
 from invenio_sipstore.archivers import BaseArchiver
+from invenio_sipstore.models import SIPMetadataType
 
 
 def calculate_md5(fs, filename):
@@ -51,14 +52,20 @@ def test_base_archiver_getters(db, sip_with_file):
     assert file.filepath in files
     assert files[file.filepath] == file.storage_location
     # get metadata
-    sip.attach_metadata('<this>is xml</this>', format='marcxml')
-    sip.attach_metadata('{"title": "json"}')
+    mjson = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url')
+    marcxml = SIPMetadataType(title='MARC XML Test', name='marcxml-test',
+                              format='xml', schema='uri')
+    db.session.add(mjson)
+    db.session.add(marcxml)
+    sip.attach_metadata('MARC XML Test', '<this>is xml</this>')
+    sip.attach_metadata('JSON Test', '{"title": "json"}')
     db.session.commit()
     metadata = archiver.get_metadata()
     assert len(metadata) == 2
-    assert 'metadata.json' in metadata
-    assert 'metadata.xml' in metadata
-    assert metadata['metadata.json'] == '{"title": "json"}'
+    assert 'json-test.json' in metadata
+    assert 'marcxml-test.xml' in metadata
+    assert metadata['json-test.json'] == '{"title": "json"}'
     # all files
     assert len(archiver.get_all_files()) == len(metadata) + len(files)
 
@@ -102,7 +109,10 @@ def test_base_archiver_copy_files(sip_with_file, tmp_archive_fs):
 def test_base_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     """Test the functions used to create an export of the SIP."""
     sip = SIP(sip_with_file)
-    sip.attach_metadata('{"title": "json"}')
+    mtype = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url://to/schema')
+    db.session.add(mtype)
+    sip.attach_metadata('JSON Test', '{"title": "json"}')
     db.session.commit()
     archiver = BaseArchiver(sip)
     # init
@@ -111,12 +121,12 @@ def test_base_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     assert tmp_archive_fs.isdir(path)
     # create
     result = archiver.create(filesdir="files", metadatadir="meth")
-    assert tmp_archive_fs.isfile('test/meth/metadata.json')
+    assert tmp_archive_fs.isfile('test/meth/json-test.json')
     assert tmp_archive_fs.isfile('test/files/foobar.txt')
     assert len(result) == 2
-    assert 'meth/metadata.json' in result
+    assert 'meth/json-test.json' in result
     assert 'files/foobar.txt' in result
     # finalize
     archiver.finalize()
-    assert archiver.path == ""
+    assert archiver.path == ''
     assert not tmp_archive_fs.exists(path)

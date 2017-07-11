@@ -42,7 +42,7 @@ from six import BytesIO
 from invenio_sipstore.api import SIP, RecordSIP
 from invenio_sipstore.models import SIP as SIP_
 from invenio_sipstore.models import RecordSIP as RecordSIP_
-from invenio_sipstore.models import SIPFile, SIPMetadata
+from invenio_sipstore.models import SIPFile, SIPMetadata, SIPMetadataType
 
 
 def test_SIP(db):
@@ -100,6 +100,9 @@ def test_SIP_metadata(db):
     """Test the metadata methods of API SIP."""
     # we create a SIP model
     sip = SIP_.create()
+    mtype = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url')
+    db.session.add(mtype)
     db.session.commit()
     # We create an API SIP on top of it
     api_sip = SIP(sip)
@@ -107,10 +110,10 @@ def test_SIP_metadata(db):
     # we create a dummy metadata
     metadata = json.dumps({'this': 'is', 'not': 'sparta'})
     # we attach it to the SIP
-    sm = api_sip.attach_metadata(metadata)
+    sm = api_sip.attach_metadata('JSON Test', metadata)
     db.session.commit()
     assert len(api_sip.metadata) == 1
-    assert api_sip.metadata[0].format == 'json'
+    assert api_sip.metadata[0].type.format == 'json'
     assert api_sip.metadata[0].content == metadata
     assert sip.sip_metadata[0].content == metadata
 
@@ -150,10 +153,16 @@ def test_SIP_create(app, db, mocker):
     obj = ObjectVersion.create(bucket, 'test.txt', stream=BytesIO(content))
     db.session.commit()
     files = [obj]
-    # setup meetadata
+    # setup metadata
+    mjson = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url')
+    marcxml = SIPMetadataType(title='MARC XML Test', name='marcxml-test',
+                              format='xml', schema='uri')
+    db.session.add(mjson)
+    db.session.add(marcxml)
     metadata = {
-        'json': json.dumps({'this': 'is', 'not': 'sparta'}),
-        'marcxml': '<record></record>'
+        'JSON Test': json.dumps({'this': 'is', 'not': 'sparta'}),
+        'MARC XML Test': '<record></record>'
     }
     # Let's create a SIP
     user = create_test_user('test@example.org')
@@ -205,11 +214,15 @@ def test_RecordSIP(db):
     assert api_recordsip.sip.id == sip.id
 
 
-def test_RecordSIP_create(db):
+def test_RecordSIP_create(db, mocker):
     """Test create method from the API class RecordSIP."""
     # we setup a file storage
     tmppath = tempfile.mkdtemp()
     db.session.add(Location(name='default', uri=tmppath, default=True))
+    # setup metadata
+    mtype = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url://to/schema')
+    db.session.add(mtype)
     db.session.commit()
     # first we create a record
     recid = uuid.uuid4()
@@ -219,7 +232,11 @@ def test_RecordSIP_create(db):
         object_type='rec',
         object_uuid=recid,
         status=PIDStatus.REGISTERED)
-    record = Record.create({'title': 'record test'}, recid)
+    mocker.patch('invenio_records.api.RecordBase.validate',
+                 return_value=True, autospec=True)
+    record = Record.create(
+        {'title': 'record test', '$schema': 'url://to/schema'},
+        recid)
     # we add a file to the record
     bucket = Bucket.create()
     content = b'Test file\n'
@@ -239,7 +256,7 @@ def test_RecordSIP_create(db):
     assert len(rsip.sip.files) == 1
     assert len(rsip.sip.metadata) == 1
     metadata = rsip.sip.metadata[0]
-    assert metadata.format == 'json'
+    assert metadata.type.format == 'json'
     assert '"title": "record test"' in metadata.content
     assert rsip.sip.archivable is True
     # we try with no files

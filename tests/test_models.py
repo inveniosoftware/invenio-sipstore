@@ -34,7 +34,8 @@ from invenio_pidstore.models import PersistentIdentifier
 from jsonschema.exceptions import ValidationError
 
 from invenio_sipstore.errors import SIPUserDoesNotExist
-from invenio_sipstore.models import SIP, RecordSIP, SIPFile, SIPMetadata
+from invenio_sipstore.models import SIP, RecordSIP, SIPFile, SIPMetadata, \
+    SIPMetadataType
 
 
 def test_sip_model(db):
@@ -90,17 +91,37 @@ def test_sip_file_storage_location(db, sip_with_file):
 def test_sip_metadata_model(db):
     """Test the SIPMetadata model."""
     sip1 = SIP.create()
+    mtype = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url')
+    db.session.add(mtype)
     metadata1 = '{"title": "great book"}'
     sipmetadata = SIPMetadata(sip_id=sip1.id, content=metadata1,
-                              format='json')
+                              type=mtype)
     db.session.add(sipmetadata)
     db.session.commit()
     assert SIP.query.count() == 1
+    assert SIPMetadataType.query.count() == 1
     assert SIPMetadata.query.count() == 1
     sipmetadata = SIPMetadata.query.one()
     assert sipmetadata.content == metadata1
-    assert sipmetadata.format == 'json'
+    assert sipmetadata.type.format == 'json'
     assert sipmetadata.sip.id == sip1.id
+
+
+def test_sip_metadatatype_model(db):
+    """Test the SIPMetadata model."""
+    sip1 = SIP.create()
+    mtype = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url')
+    db.session.add(mtype)
+    db.session.commit()
+    assert SIP.query.count() == 1
+    assert SIPMetadataType.query.count() == 1
+    sipmetadatatype = SIPMetadataType.get(mtype.id)
+    assert sipmetadatatype.title == 'JSON Test'
+    assert sipmetadatatype.format == 'json'
+    assert sipmetadatatype.name == 'json-test'
+    assert sipmetadatatype.schema == 'url'
 
 
 def test_record_sip_model(db):

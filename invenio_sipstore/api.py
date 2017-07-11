@@ -33,7 +33,7 @@ from werkzeug.utils import import_string
 
 from invenio_sipstore.models import SIP as SIP_
 from invenio_sipstore.models import RecordSIP as RecordSIP_
-from invenio_sipstore.models import SIPFile, SIPMetadata
+from invenio_sipstore.models import SIPFile, SIPMetadata, SIPMetadataType
 from invenio_sipstore.signals import sipstore_created
 
 
@@ -44,7 +44,7 @@ class SIP(object):
         """Constructor.
 
         :param sip: the SIP model associated
-        :type sip: :py:data:`invenio_sipstore.models.SIP`
+        :type sip: :py:class:`invenio_sipstore.models.SIP`
         """
         self.model = sip
 
@@ -106,7 +106,7 @@ class SIP(object):
     def files(self):
         """Return the list of files associated with the SIP.
 
-        :rtype: list(:py:data:`invenio_sipstore.models.SIPFile`)
+        :rtype: list(:py:class:`invenio_sipstore.models.SIPFile`)
         """
         return self.model.sip_files
 
@@ -114,7 +114,7 @@ class SIP(object):
     def metadata(self):
         """Return the list of metadata associated with the SIP.
 
-        :rtype: list(:py:data:`invenio_sipstore.models.SIPMetadata`)
+        :rtype: list(:py:class:`invenio_sipstore.models.SIPMetadata`)
         """
         return self.model.sip_metadata
 
@@ -122,24 +122,26 @@ class SIP(object):
         """Add a file to the SIP.
 
         :param file: the file to attach. It must at least implement a `key`
-        and a valid `file_id`. See
-        :py:class:`invenio-files_rest.models.ObjectVersion`.
+            and a valid `file_id`. See
+            :py:class:`invenio_files_rest.models.ObjectVersion`.
         :returns: the created SIPFile
-        :rtype: :py:data:`invenio_sipstore.models.SIPFile`
+        :rtype: :py:class:`invenio_sipstore.models.SIPFile`
         """
         sf = SIPFile(sip_id=self.id, filepath=file.key, file_id=file.file_id)
         db.session.add(sf)
         return sf
 
-    def attach_metadata(self, metadata, format='json'):
+    def attach_metadata(self, type, metadata):
         """Add metadata to the SIP.
 
+        :param str type: the type of metadata (a valid
+            :py:class:`invenio_sipstore.models.SIPMetadataType` title)
         :param str metadata: the metadata to attach.
-        :param str format: the format of metadata (json, marcxml...)
         :returns: the created SIPMetadata
-        :rtype: :py:data:`invenio_sipstore.models.SIPMetadata`
+        :rtype: :py:class:`invenio_sipstore.models.SIPMetadata`
         """
-        sm = SIPMetadata(sip_id=self.id, format=format, content=metadata)
+        mtype = SIPMetadataType.get_from_title(type)
+        sm = SIPMetadata(sip_id=self.id, type=mtype, content=metadata)
         db.session.add(sm)
         return sm
 
@@ -154,14 +156,16 @@ class SIP(object):
         Those objects are not returned by this function but can be fetched by
         the corresponding SIP attributes 'files' and 'metadata'.
         The created model is stored in the attribute 'model'.
+
         :param bool archivable: tells if the SIP should be archived or not.
-        Usefull if ``Invenio-Archivematica`` is installed.
-        :param list files: The list of files to associate with the SIP. See
-        :py:func:`invenio_sipstore.api.SIP.attach_file`
+            Usefull if ``Invenio-Archivematica`` is installed.
+        :param files: The list of files to associate with the SIP. See
+            :py:func:`invenio_sipstore.api.SIP.attach_file`
         :param dict metadata: A dictionary of metadata. The keys are the
-        format (json, marcxml...) and the values are the content (string)
+            type (valid :py:class:`invenio_sipstore.models.SIPMetadataType`
+            title) and the values are the content (string)
         :param user_id: the ID of the user. If not given, automatically
-        computed
+            computed
         :param agent: If not given, automatically computed
         :returns: API SIP object.
         :rtype: :py:class:`invenio_sipstore.api.SIP`
@@ -181,8 +185,8 @@ class SIP(object):
                                   archivable=archivable))
             for f in files:
                 sip.attach_file(f)
-            for format, content in metadata.items():
-                sip.attach_metadata(content, format)
+            for type, content in metadata.items():
+                sip.attach_metadata(type, content)
         sipstore_created.send(sip)
         return sip
 
@@ -199,12 +203,12 @@ class RecordSIP(object):
         """Constructor.
 
         :param recordsip: the RecordSIP model to manage
-        :type recordsip: :py:data:`invenio_sipstore.models.RecordSIP`
+        :type recordsip: :py:class:`invenio_sipstore.models.RecordSIP`
         :param sip: the SIP associated
-        :type sip: :py:data:`invenio_sipstore.api.SIP`
+        :type sip: :py:class:`invenio_sipstore.api.SIP`
         """
         self.model = recordsip
-        self.__sip = sip
+        self._sip = sip
 
     # we make it unwritable
     @property
@@ -213,7 +217,7 @@ class RecordSIP(object):
 
         :rtype: :py:class:`invenio_sipstore.api.SIP`
         """
-        return self.__sip
+        return self._sip
 
     @classmethod
     def create(cls, pid, record, archivable, create_sip_files=True,
@@ -225,20 +229,22 @@ class RecordSIP(object):
         of the files in the record, along with ``SIPMetadata`` for the
         metadata.
         Those objects are not returned by this function but can be fetched by
-        the corresponding RecordSIP attributes 'sip', 'sip.files' and
-        'sip.metadata'.
+        the corresponding RecordSIP attributes ``sip``, ``sip.files`` and
+        ``sip.metadata``.
+
         :param pid: PID of the published record ('recid').
-        :type pid: `invenio_pidstore.models.PersistentIdentifier`
+        :type pid: :py:class:`invenio_pidstore.models.PersistentIdentifier`
         :param record: Record for which the SIP should be created.
-        :type record: `invenio_records.api.Record`
+        :type record: :py:class:`invenio_records.api.Record`
         :param bool archivable: tells if the record should be archived.
-        Usefull when ``Invenio-Archivematica`` is installed.
+            Usefull when ``Invenio-Archivematica`` is installed.
         :param bool create_sip_files: If True the SIPFiles will be created.
         :returns: RecordSIP object.
         :rtype: :py:class:`invenio_sipstore.api.RecordSIP`
         """
         files = record.files if create_sip_files else None
-        metadata = {'json': json.dumps(record.dumps())}
+        mtype = SIPMetadataType.get_from_schema(record['$schema'])
+        metadata = {mtype.title: json.dumps(record.dumps())}
         with db.session.begin_nested():
             sip = SIP.create(archivable, files=files, metadata=metadata,
                              user_id=user_id, agent=agent)

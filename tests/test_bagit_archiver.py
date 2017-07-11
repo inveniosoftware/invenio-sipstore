@@ -30,6 +30,7 @@ import pytest
 
 from invenio_sipstore.api import SIP
 from invenio_sipstore.archivers import BagItArchiver
+from invenio_sipstore.models import SIPMetadataType
 
 
 def test_bagit_archiver_get_all_files(sip_with_file):
@@ -122,7 +123,10 @@ def test_bagit_archiver_get_tagmanifest():
 def test_bagit_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     """Test the functions used to create an export of the SIP."""
     sip = SIP(sip_with_file)
-    sip.attach_metadata('{"title": "json"}')
+    mtype = SIPMetadataType(title='JSON Test', name='json-test',
+                            format='json', schema='url://to/schema')
+    db.session.add(mtype)
+    sip.attach_metadata('JSON Test', '{"title": "json"}')
     db.session.commit()
     archiver = BagItArchiver(sip)
     # init
@@ -131,14 +135,14 @@ def test_bagit_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     assert tmp_archive_fs.isdir(path)
     # create
     result = archiver.create()
-    assert tmp_archive_fs.isfile('test/data/metadata.json')
+    assert tmp_archive_fs.isfile('test/data/json-test.json')
     assert tmp_archive_fs.isfile('test/data/files/foobar.txt')
     assert tmp_archive_fs.isfile('test/manifest-md5.txt')
     assert tmp_archive_fs.isfile('test/bagit.txt')
     assert tmp_archive_fs.isfile('test/bag-info.txt')
     assert tmp_archive_fs.isfile('test/tagmanifest-md5.txt')
     assert len(result) == 6
-    assert 'data/metadata.json' in result
+    assert 'data/json-test.json' in result
     assert 'data/files/foobar.txt' in result
     assert 'manifest-md5.txt' in result
     assert 'bagit.txt' in result
@@ -146,5 +150,5 @@ def test_bagit_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     assert 'tagmanifest-md5.txt' in result
     # finalize
     archiver.finalize()
-    assert archiver.path == ""
+    assert archiver.path == ''
     assert not tmp_archive_fs.exists(path)

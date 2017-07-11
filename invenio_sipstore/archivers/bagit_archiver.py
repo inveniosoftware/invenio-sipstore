@@ -47,8 +47,8 @@ class BagItArchiver(BaseArchiver):
         """Return the complete list of files in the archive.
 
         All the files + all the metadata + bagit information.
+
         :return: the list of all relative final path
-        :rtype: list
         """
         files = super(BagItArchiver, self).get_all_files()
         return files + ['manifest-md5.txt', 'bagit.txt', 'bag-info.txt',
@@ -58,7 +58,7 @@ class BagItArchiver(BaseArchiver):
         """Archive the SIP generating a BagIt file.
 
         :returns: a dictionnary with the filenames as keys, and size and
-        checksum as value
+            checksum as value
         :rtype: dict
         """
         files_info = super(BagItArchiver, self).create(
