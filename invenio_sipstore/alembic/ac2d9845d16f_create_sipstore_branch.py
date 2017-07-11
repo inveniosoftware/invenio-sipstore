@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016 CERN.
+# Copyright (C) 2017 CERN.
 #
 # Invenio is free software; you can redistribute it
 # and/or modify it under the terms of the GNU General Public License as
@@ -22,18 +21,21 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-include .dockerignore
-include .editorconfig
-include .lgtm
-include *.rst
-include *.sh
-include *.txt
-include docs/requirements.txt
-include LICENSE
-include MAINTAINERS
-include pytest.ini
-recursive-include docs *.bat *.py *.rst
-recursive-include docs Makefile
-recursive-include examples *.py
-recursive-include invenio_sipstore *.py *.json *.html
-recursive-include tests *.py
+"""Create sipstore branch."""
+
+import sqlalchemy as sa
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision = 'ac2d9845d16f'
+down_revision = 'dbdbc1b19cf2'
+branch_labels = (u'invenio_sipstore',)
+depends_on = 'dbdbc1b19cf2'
+
+
+def upgrade():
+    """Upgrade database."""
+
+
+def downgrade():
+    """Downgrade database."""

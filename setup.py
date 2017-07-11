@@ -97,6 +97,9 @@ setup(
         'invenio_db.models': [
             'invenio_sipstore = invenio_sipstore.models',
         ],
+        'invenio_db.alembic': [
+            'invenio_sipstore = invenio_sipstore:alembic',
+        ],
         'invenio_base.apps': [
             'invenio_sipstore = invenio_sipstore:InvenioSIPStore',
         ],

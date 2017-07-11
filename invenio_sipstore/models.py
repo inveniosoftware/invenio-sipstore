@@ -62,10 +62,11 @@ class SIP(db.Model, Timestamp):
     content = db.Column(db.Text, nullable=False)
     """Text blob of the SIP content."""
 
-    user_id = db.Column(db.Integer,
-                        db.ForeignKey(User.id),
-                        nullable=True,
-                        default=None)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey(User.id, name='fk_sipstore_sip_user_id'),
+        nullable=True,
+        default=None)
     """User responsible for the SIP."""
 
     agent = db.Column(JSONType, default=lambda: dict(), nullable=False)
@@ -122,7 +123,10 @@ class SIPFile(db.Model, Timestamp):
 
     __tablename__ = 'sipstore_sipfile'
 
-    sip_id = db.Column(UUIDType, db.ForeignKey(SIP.id), primary_key=True)
+    sip_id = db.Column(
+        UUIDType,
+        db.ForeignKey(SIP.id, name='fk_sipstore_sipfile_sip_id'),
+        primary_key=True)
     """Id of SIP."""
 
     filepath = db.Column(
@@ -132,7 +136,8 @@ class SIPFile(db.Model, Timestamp):
 
     file_id = db.Column(
         UUIDType,
-        db.ForeignKey(FileInstance.id, ondelete='RESTRICT'),
+        db.ForeignKey(FileInstance.id, name='fk_sipstore_sipfile_file_id',
+                      ondelete='RESTRICT'),
         nullable=False)
     """Id of the FileInstance."""
 
@@ -160,12 +165,17 @@ class RecordSIP(db.Model, Timestamp):
 
     __tablename__ = 'sipstore_recordsip'
 
-    sip_id = db.Column(UUIDType, db.ForeignKey(SIP.id),
-                       primary_key=True)
+    sip_id = db.Column(
+        UUIDType,
+        db.ForeignKey(SIP.id, name='fk_sipstore_recordsip_sip_id'),
+        primary_key=True)
     """Id of SIP."""
 
-    pid_id = db.Column(db.Integer, db.ForeignKey(PersistentIdentifier.id),
-                       primary_key=True)
+    pid_id = db.Column(
+        db.Integer,
+        db.ForeignKey(PersistentIdentifier.id,
+                      name='fk_sipstore_recordsip_pid_id'),
+        primary_key=True)
     """Id of the PID pointing to the record."""
 
     #
