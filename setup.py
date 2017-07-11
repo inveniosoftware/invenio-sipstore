@@ -62,12 +62,12 @@ setup_requires = [
 
 install_requires = [
     'Flask>=0.11.1',
-    'invenio-db>=1.0.0a9',
-    'invenio-accounts>=1.0.0a10',
-    'invenio-pidstore>=1.0.0a7',
-    'invenio-jsonschemas>=1.0.0a3',
-    'invenio-files-rest>=1.0.0a1',
-    'jsonschema>=2.5.1',
+    'invenio-db>=1.0.0b7',
+    'invenio-accounts>=1.0.0b5',
+    'invenio-pidstore>=1.0.0b1',
+    'invenio-jsonschemas>=1.0.0a4',
+    'invenio-files-rest>=1.0.0a17',
+    'jsonschema>=2.6.0',
 ]
 
 packages = find_packages()
