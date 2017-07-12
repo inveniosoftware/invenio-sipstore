@@ -24,10 +24,11 @@
 
 """Base Archiver class for SIP."""
 
+from hashlib import md5
+
 from fs.opener import opener
 from fs.path import dirname, join
 from fs.utils import copyfile
-from hashlib import md5
 from six import b
 
 from invenio_sipstore.signals import sipstore_archiver_status
@@ -94,17 +95,20 @@ class BaseArchiver(object):
         self.path = folder
         self._create_directories(folder)
 
-    def create(self, filesdir="", metadatadir=""):
+    def create(self, filesdir="", metadatadir="", sipfiles=None):
         """Create the archive.
 
         :param str filesdir: the directory where to put files if necessary
         :param str metadatadir: the directory where to put metadata if
             necessary
+        :param sipfiles: list of SIPFile objects to write. By default
+            it's all of the SIPFiles attached to the SIP.
         :returns: a dictionnary with the filenames as keys, and size and
             checksum as value
         :rtype: dict
         """
-        files_info = self._copy_files(self.sip.files, filesdir)
+        sipfiles = sipfiles or self.sip.files
+        files_info = self._copy_files(sipfiles, filesdir)
         metadata = self.get_metadata()
         for filename, content in metadata.items():
             files_info.update(self._save_file(
@@ -155,6 +159,8 @@ class BaseArchiver(object):
             result[filename] = {
                 'size': file.size,
                 'checksum': file.checksum,
+                'path': self.fs.getsyspath(calculated_filename),
+                'file_uuid': str(file.file.id)
             }
             copied_size += file.size
 
@@ -195,5 +201,6 @@ class BaseArchiver(object):
             filename: {
                 'size': len(content),
                 'checksum': 'md5:' + str(md5(content).hexdigest()),
+                'path': self.fs.getsyspath(filenamepath)
             }
         }

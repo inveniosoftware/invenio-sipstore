@@ -45,7 +45,8 @@ from sqlalchemy_utils.functions import create_database, database_exists, \
     drop_database
 
 from invenio_sipstore import InvenioSIPStore
-from invenio_sipstore.models import SIP, SIPFile
+from invenio_sipstore.archivers import BagItArchiver
+from invenio_sipstore.models import SIP, SIPFile, SIPMetadataType
 
 
 @pytest.yield_fixture(scope='session')
@@ -107,6 +108,33 @@ def dummy_location(db, instance_path):
     db.session.add(loc)
     db.session.commit()
     return loc
+
+
+@pytest.fixture()
+def sip_metadata_types(db):
+    """Add a SIP metadata type (internal use only) for BagIt."""
+    bagit_type = SIPMetadataType(
+        title='BagIt Archiver Metadata',
+        name=BagItArchiver.bagit_metadata_type_name,
+        format='json',
+        )
+    json_type = SIPMetadataType(
+        title='Record JSON Metadata',
+        name='json-test',
+        format='json')
+
+    xml_type = SIPMetadataType(
+        title='Record XML Metadata',
+        name='xml-test',
+        format='xml')
+
+    db.session.add(bagit_type)
+    db.session.add(json_type)
+    db.session.add(xml_type)
+    db.session.commit()
+    types = dict((t.name, t) for t in [bagit_type, json_type, xml_type])
+
+    return types
 
 
 @pytest.fixture()
