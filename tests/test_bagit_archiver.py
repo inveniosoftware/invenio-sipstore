@@ -126,7 +126,7 @@ def test_bagit_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     mtype = SIPMetadataType(title='JSON Test', name='json-test',
                             format='json', schema='url://to/schema')
     db.session.add(mtype)
-    sip.attach_metadata('JSON Test', '{"title": "json"}')
+    sip.attach_metadata('json-test', '{"title": "json"}')
     db.session.commit()
     archiver = BagItArchiver(sip)
     # init

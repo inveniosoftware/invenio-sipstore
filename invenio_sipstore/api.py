@@ -135,12 +135,12 @@ class SIP(object):
         """Add metadata to the SIP.
 
         :param str type: the type of metadata (a valid
-            :py:class:`invenio_sipstore.models.SIPMetadataType` title)
+            :py:class:`invenio_sipstore.models.SIPMetadataType` name)
         :param str metadata: the metadata to attach.
         :returns: the created SIPMetadata
         :rtype: :py:class:`invenio_sipstore.models.SIPMetadata`
         """
-        mtype = SIPMetadataType.get_from_title(type)
+        mtype = SIPMetadataType.get_from_name(type)
         sm = SIPMetadata(sip_id=self.id, type=mtype, content=metadata)
         db.session.add(sm)
         return sm
@@ -163,7 +163,7 @@ class SIP(object):
             :py:func:`invenio_sipstore.api.SIP.attach_file`
         :param dict metadata: A dictionary of metadata. The keys are the
             type (valid :py:class:`invenio_sipstore.models.SIPMetadataType`
-            title) and the values are the content (string)
+            name) and the values are the content (string)
         :param user_id: the ID of the user. If not given, automatically
             computed
         :param agent: If not given, automatically computed
@@ -244,7 +244,7 @@ class RecordSIP(object):
         """
         files = record.files if create_sip_files else None
         mtype = SIPMetadataType.get_from_schema(record['$schema'])
-        metadata = {mtype.title: json.dumps(record.dumps())}
+        metadata = {mtype.name: json.dumps(record.dumps())}
         with db.session.begin_nested():
             sip = SIP.create(archivable, files=files, metadata=metadata,
                              user_id=user_id, agent=agent)

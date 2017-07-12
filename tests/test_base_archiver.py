@@ -58,8 +58,8 @@ def test_base_archiver_getters(db, sip_with_file):
                               format='xml', schema='uri')
     db.session.add(mjson)
     db.session.add(marcxml)
-    sip.attach_metadata('MARC XML Test', '<this>is xml</this>')
-    sip.attach_metadata('JSON Test', '{"title": "json"}')
+    sip.attach_metadata('marcxml-test', '<this>is xml</this>')
+    sip.attach_metadata('json-test', '{"title": "json"}')
     db.session.commit()
     metadata = archiver.get_metadata()
     assert len(metadata) == 2
@@ -112,7 +112,7 @@ def test_base_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     mtype = SIPMetadataType(title='JSON Test', name='json-test',
                             format='json', schema='url://to/schema')
     db.session.add(mtype)
-    sip.attach_metadata('JSON Test', '{"title": "json"}')
+    sip.attach_metadata('json-test', '{"title": "json"}')
     db.session.commit()
     archiver = BaseArchiver(sip)
     # init

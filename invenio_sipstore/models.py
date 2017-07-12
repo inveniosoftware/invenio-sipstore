@@ -192,11 +192,11 @@ class SIPMetadataType(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     """ID of the SIPMetadataType object."""
 
-    title = db.Column(db.String(255), nullable=False, unique=True)
+    title = db.Column(db.String(255), nullable=False)
     """The title of type of metadata (i.e. 'Invenio JSON Record v1.0.0')."""
 
-    name = db.Column(db.String(255), nullable=False)
-    """The name used to create a file when we export the metadata."""
+    name = db.Column(db.String(255), nullable=False, unique=True)
+    """The unique name tag of the metadata type."""
 
     format = db.Column(db.String(255), nullable=False)
     """The format of the metadata (xml, json, txt...).
@@ -213,9 +213,9 @@ class SIPMetadataType(db.Model):
         return cls.query.filter_by(id=id).one()
 
     @classmethod
-    def get_from_title(cls, title):
+    def get_from_name(cls, name):
         """Return the corresponding SIPMetadataType."""
-        return cls.query.filter_by(title=title).one()
+        return cls.query.filter_by(name=name).one()
 
     @classmethod
     def get_from_schema(cls, schema):

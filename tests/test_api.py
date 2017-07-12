@@ -110,7 +110,7 @@ def test_SIP_metadata(db):
     # we create a dummy metadata
     metadata = json.dumps({'this': 'is', 'not': 'sparta'})
     # we attach it to the SIP
-    sm = api_sip.attach_metadata('JSON Test', metadata)
+    sm = api_sip.attach_metadata('json-test', metadata)
     db.session.commit()
     assert len(api_sip.metadata) == 1
     assert api_sip.metadata[0].type.format == 'json'
@@ -161,8 +161,8 @@ def test_SIP_create(app, db, mocker):
     db.session.add(mjson)
     db.session.add(marcxml)
     metadata = {
-        'JSON Test': json.dumps({'this': 'is', 'not': 'sparta'}),
-        'MARC XML Test': '<record></record>'
+        'json-test': json.dumps({'this': 'is', 'not': 'sparta'}),
+        'marcxml-test': '<record></record>'
     }
     # Let's create a SIP
     user = create_test_user('test@example.org')
