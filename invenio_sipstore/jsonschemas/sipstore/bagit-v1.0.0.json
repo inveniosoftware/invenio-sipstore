@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "title": "BagIt Archiver metadata schema.",
+  "description": "Metadata for BagIt-archived SIPs.",
+  "definitions": {
+    "archived_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "filename": {
+          "description": "Filename of the file.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Full path to the file in the archive.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size of the file in bytes.",
+          "type": "number"
+        },
+        "checksum": {
+          "description": "MD5 checksum of the file. Always starts with 'md5:' prefix.",
+          "type": "string"
+        },
+        "file_uuid": {
+          "description": "UUID of the related FileInstance object (if any).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "filename",
+        "size",
+        "checksum",
+        "path"
+      ]
+    }
+  },
+  "properties": {
+    "manifest": {
+      "description": "Files that are specified in the bag manifest.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/archived_file"
+      }
+    },
+    "fetch": {
+      "description": "Files that are fetched externally to complete the bag.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/archived_file"
+      }
+    }
+  }
+}
