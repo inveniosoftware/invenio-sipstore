@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016 CERN.
+# Copyright (C) 2017 CERN.
 #
 # Invenio is free software; you can redistribute it
 # and/or modify it under the terms of the GNU General Public License as
@@ -22,23 +22,12 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-"""Default configuration of Invenio-SIPStore module."""
 
-SIPSTORE_DEFAULT_AGENT_JSONSCHEMA = 'sipstore/agent-v1.0.0.json'
-"""Default JSON schema for extra SIP agent information.
+"""Pytest helpers."""
 
-For more examples, you can have a look at Zenodo's config:
-https://github.com/zenodo/zenodo/tree/master/zenodo/modules/sipstore/jsonschemas/sipstore
-"""
+from __future__ import absolute_import, print_function
 
-SIPSTORE_DEFAULT_BAGIT_JSONSCHEMA = 'sipstore/bagit-v1.0.0.json'
-"""Default JSON schema for BagIt archiver."""
 
-SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
-"""Enable SIP agent validation by default."""
-
-SIPSTORE_AGENT_FACTORY = 'invenio_sipstore.api.SIP._build_agent_info'
-"""Factory to build the agent, stored for the information about the SIP."""
-
-SIPSTORE_FILEPATH_MAX_LEN = 1024
-"""Max filepath length."""
+def get_file(filename, result):
+    """Get a file by its filename from the results list."""
+    return next((f for f in result if f['filename'] == filename), None)

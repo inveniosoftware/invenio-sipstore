@@ -27,6 +27,7 @@
 from __future__ import absolute_import, print_function
 
 import pytest
+from helpers import get_file
 from invenio_files_rest.models import FileInstance
 from six import BytesIO
 
@@ -61,13 +62,28 @@ def test_bagit_archiver_get_checksum():
 def test_bagit_archiver_autogenerate_tags():
     """Test the function autogenerate_tags."""
     archiver = BagItArchiver(None, tags={'test': 'concluant'})
-    files_info = {
-        'file1': {'size': 42},
-        'file2': {'size': 42},
-        'file3': {'size': 42},
-        'file4': {'size': 42},
-        'file5': {'size': 42}
-    }
+    files_info = [
+        {
+            'filename': 'file1',
+            'size': 42,
+        },
+        {
+            'filename': 'file2',
+            'size': 42,
+        },
+        {
+            'filename': 'file3',
+            'size': 42,
+        },
+        {
+            'filename': 'file4',
+            'size': 42,
+        },
+        {
+            'filename': 'file5',
+            'size': 42,
+        },
+    ]
     archiver.autogenerate_tags(files_info)
     tags = archiver.tags
     assert 'test' in tags
@@ -80,10 +96,16 @@ def test_bagit_archiver_autogenerate_tags():
 def test_bagit_archiver_get_manifest_file():
     """Test the function get_manifest_file."""
     archiver = BagItArchiver(None)
-    files_info = {
-        'file1': {'checksum': 'md5:13'},
-        'file2': {'checksum': 'md5:37'}
-    }
+    files_info = [
+        {
+            'filename': 'file1',
+            'checksum': 'md5:13',
+        },
+        {
+            'filename': 'file2',
+            'checksum': 'md5:37',
+        }
+    ]
     name, content = archiver.get_manifest_file(files_info)
     assert name == 'manifest-md5.txt'
     assert '13 file1' in content
@@ -114,10 +136,16 @@ def test_bagit_archiver_get_baginfo_file():
 def test_bagit_archiver_get_tagmanifest():
     """Test the function get_tagmanifest."""
     archiver = BagItArchiver(None)
-    files_info = {
-        'file1': {'checksum': 'md5:13'},
-        None: {'checksum': 'md5:37'}
-    }
+    files_info = [
+        {
+            'filename': 'file1',
+            'checksum': 'md5:13'
+        },
+        {
+            'filename': None,
+            'checksum': 'md5:37',
+        }
+    ]
     name, content = archiver.get_tagmanifest(files_info)
     assert name == 'tagmanifest-md5.txt'
     assert content == '13 file1'
@@ -143,12 +171,12 @@ def test_bagit_archiver_create_archive(db, sip_with_file, tmp_archive_fs,
     assert tmp_archive_fs.isfile('test/bag-info.txt')
     assert tmp_archive_fs.isfile('test/tagmanifest-md5.txt')
     assert len(result) == 6
-    assert 'data/metadata/json-test.json' in result
-    assert 'data/files/foobar.txt' in result
-    assert 'manifest-md5.txt' in result
-    assert 'bagit.txt' in result
-    assert 'bag-info.txt' in result
-    assert 'tagmanifest-md5.txt' in result
+    assert get_file('data/metadata/json-test.json', result)
+    assert get_file('data/files/foobar.txt', result)
+    assert get_file('manifest-md5.txt', result)
+    assert get_file('bagit.txt', result)
+    assert get_file('bag-info.txt', result)
+    assert get_file('tagmanifest-md5.txt', result)
     # finalize
     archiver.finalize()
     assert archiver.path == ''
@@ -175,7 +203,7 @@ def archived_bagit_sip(db, dummy_location, sip_with_file, tmp_archive_fs,
     # init
     archiver.init(tmp_archive_fs, 'test')
     # create
-    archiver.create(create_bagit_metadata=True)
+    archiver.create()
 
     # Make a new SIP with one of the previous file and a new one
     sip2 = SIP(SIPModel.create())
@@ -198,18 +226,16 @@ def archived_bagit_sip(db, dummy_location, sip_with_file, tmp_archive_fs,
     archiver = BagItArchiver(sip2)
     archiver.init(tmp_archive_fs, 'test2')
 
-    return sip1, file1, file2, file3, archiver
+    return sip1, sip2, file1, file2, file3, archiver
 
 
 def test_bagit_archiver_create_archive_fetch_file(
         archived_bagit_sip, dummy_location, db, sip_with_file,
         tmp_archive_fs):
     """Test the BagIt archiving with previous SIP as a base for diffing."""
-
-    sip1, file1, file2, file3, archiver = archived_bagit_sip
+    sip1, sip2, file1, file2, file3, archiver = archived_bagit_sip
     # create a BagIt for the SIP 2, but make it a patch of the SIP 1
-    result = archiver.create(create_bagit_metadata=True, patch_of=sip1,
-                             include_missing_files=True)
+    result = archiver.create(patch_of=sip1, include_missing_files=True)
 
     assert tmp_archive_fs.isfile('test2/data/metadata/json-test.json')
     assert tmp_archive_fs.isfile('test2/data/metadata/xml-test.xml')
@@ -227,20 +253,21 @@ def test_bagit_archiver_create_archive_fetch_file(
     assert tmp_archive_fs.isfile('test2/tagmanifest-md5.txt')
 
     assert len(result) == 10
-    assert 'data/metadata/json-test.json' in result
-    assert 'data/metadata/xml-test.xml' in result
-    assert 'data/files/foobar.txt' in result
+    assert get_file('data/metadata/json-test.json', result)
+    assert get_file('data/metadata/xml-test.xml', result)
+    assert get_file('data/files/foobar.txt', result)
     # Check if the correct file was referenced
-    assert result['data/files/foobar.txt']['file_uuid'] == str(file1.id)
-    assert 'data/files/foobar2-renamed.txt' in result
-    assert result['data/files/foobar2-renamed.txt']['file_uuid'] == \
+    assert get_file('data/files/foobar.txt', result)['file_uuid'] == \
+        str(file1.id)
+    assert get_file('data/files/foobar2-renamed.txt', result)
+    assert get_file('data/files/foobar2-renamed.txt', result)['file_uuid'] == \
         str(file2.id)
-    assert 'data/files/foobar3.txt' in result
-    assert 'manifest-md5.txt' in result
-    assert 'bagit.txt' in result
-    assert 'bag-info.txt' in result
-    assert 'tagmanifest-md5.txt' in result
-    assert 'fetch.txt' in result
+    assert get_file('data/files/foobar3.txt', result)
+    assert get_file('manifest-md5.txt', result)
+    assert get_file('bagit.txt', result)
+    assert get_file('bag-info.txt', result)
+    assert get_file('tagmanifest-md5.txt', result)
+    assert get_file('fetch.txt', result)
 
     # Should be specified in the fetch and manifest
     with tmp_archive_fs.open('test2/fetch.txt') as fp:
@@ -265,6 +292,90 @@ def test_bagit_archiver_create_archive_fetch_file(
         manifest = fp.read().splitlines()
         assert all(item in manifest for item in expected_manifest)
 
+    sip1_bagit_meta = {
+        '$schema': 'https://localhost/schemas/sipstore/bagit-v1.0.0.json',
+        'manifest': [
+            {
+                'checksum': 'md5:098f6bcd4621d373cade4e832627b4f6',
+                'file_uuid': file1.id,
+                'filename': 'data/files/foobar.txt',
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar.txt'),
+                'size': 4,
+            },
+            {
+                'checksum': 'md5:652b054df498ace88fef9857785fce34',
+                'file_uuid': file2.id,
+                'filename': 'data/files/foobar2.txt',
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar2.txt'),
+                'size': 11},
+            {
+                'checksum': 'md5:2e543b56c27ade33aad2d5eb870b23ba',
+                'filename': 'data/metadata/json-test.json',
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/metadata/json-test.json'),
+                'size': 22
+            }
+        ]
+    }
+    BagItArchiver.get_bagit_metadata(sip1) == sip1_bagit_meta
+
+    sip2_bagit_meta = {
+        "$schema": "https://localhost/schemas/sipstore/bagit-v1.0.0.json",
+        "fetch": [
+            {
+                "size": 11,
+                "checksum": "md5:652b054df498ace88fef9857785fce34",
+                "filename": "data/files/foobar2-renamed.txt",
+                "file_uuid": file2.id,
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar2.txt'),
+            },
+            {
+                "size": 11,
+                "checksum": "md5:652b054df498ace88fef9857785fce34",
+                "filename": "data/files/foobar2-renamed.txt",
+                "file_uuid": file2.id,
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar2.txt'),
+            }
+        ],
+        "manifest": [
+            {
+                "checksum": "md5:f1d2f9e84f147fed5fab05c6f8210c6f",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar3.txt'),
+                "filename": "data/files/foobar3.txt",
+                "file_uuid": file3.id,
+                "size": 10
+            },
+            {
+                "checksum": "md5:3acfb5b50e960eece15dbed928d9e40f",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/metadata/xml-test.xml'),
+                "filename": "data/metadata/xml-test.xml",
+                "size": 17
+            },
+            {
+                "checksum": "md5:1963a365b400a214cf9b89354bcd6169",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/metadata/json-test.json'),
+                "filename": "data/metadata/json-test.json",
+                "size": 24
+            },
+            {
+                "size": 11,
+                "checksum": "md5:652b054df498ace88fef9857785fce34",
+                "filename": "data/files/foobar2-renamed.txt",
+                "file_uuid": file2.id,
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar2.txt'),
+            }
+        ]
+    }
+    BagItArchiver.get_bagit_metadata(sip2) == sip2_bagit_meta
+
 
 def test_bagit_archiver_create_archive_fetch_file_deleted(
         archived_bagit_sip, dummy_location, db, sip_with_file,
@@ -274,11 +385,9 @@ def test_bagit_archiver_create_archive_fetch_file_deleted(
 
     Treats missing files as deleted.
     """
-
-    sip1, file1, file2, file3, archiver = archived_bagit_sip
+    sip1, sip2, file1, file2, file3, archiver = archived_bagit_sip
     # create a BagIt for the SIP 2, but make it a patch of the SIP 1
-    result = archiver.create(create_bagit_metadata=True, patch_of=sip1,
-                             include_missing_files=False)
+    result = archiver.create(patch_of=sip1, include_missing_files=False)
 
     assert tmp_archive_fs.isfile('test2/data/metadata/json-test.json')
     assert tmp_archive_fs.isfile('test2/data/metadata/xml-test.xml')
@@ -297,20 +406,20 @@ def test_bagit_archiver_create_archive_fetch_file_deleted(
     assert tmp_archive_fs.isfile('test2/tagmanifest-md5.txt')
 
     assert len(result) == 9
-    assert 'data/metadata/json-test.json' in result
-    assert 'data/metadata/xml-test.xml' in result
+    assert get_file('data/metadata/json-test.json', result)
+    assert get_file('data/metadata/xml-test.xml', result)
     # The file ommited from SIP should not be specified
-    assert 'data/files/foobar.txt' not in result
+    assert not get_file('data/files/foobar.txt', result)
     # Check if the correct file was referenced
-    assert 'data/files/foobar2-renamed.txt' in result
-    assert result['data/files/foobar2-renamed.txt']['file_uuid'] == \
+    assert get_file('data/files/foobar2-renamed.txt', result)
+    assert get_file('data/files/foobar2-renamed.txt', result)['file_uuid'] == \
         str(file2.id)
-    assert 'data/files/foobar3.txt' in result
-    assert 'manifest-md5.txt' in result
-    assert 'bagit.txt' in result
-    assert 'bag-info.txt' in result
-    assert 'tagmanifest-md5.txt' in result
-    assert 'fetch.txt' in result
+    assert get_file('data/files/foobar3.txt', result)
+    assert get_file('manifest-md5.txt', result)
+    assert get_file('bagit.txt', result)
+    assert get_file('bag-info.txt', result)
+    assert get_file('tagmanifest-md5.txt', result)
+    assert get_file('fetch.txt', result)
 
     # File should be specified in the fetch and manifest
     with tmp_archive_fs.open('test2/fetch.txt') as fp:
@@ -332,3 +441,50 @@ def test_bagit_archiver_create_archive_fetch_file_deleted(
 
         manifest = fp.read().splitlines()
         assert set(manifest) == set(expected_manifest)
+
+    sip2_bagit_meta = {
+        "$schema": "https://localhost/schemas/sipstore/bagit-v1.0.0.json",
+        "fetch": [
+            {
+                "size": 11,
+                "checksum": "md5:652b054df498ace88fef9857785fce34",
+                "filename": "data/files/foobar2-renamed.txt",
+                "file_uuid": "2b5ae0dd-9ef1-4194-a675-a0daef49b001",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar2.txt'),
+            }
+        ],
+        "manifest": [
+            {
+                "checksum": "md5:f1d2f9e84f147fed5fab05c6f8210c6f",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar3.txt'),
+                "filename": "data/files/foobar3.txt",
+                "file_uuid": file3.id,
+                "size": 10
+            },
+            {
+                "checksum": "md5:3acfb5b50e960eece15dbed928d9e40f",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/metadata/xml-test.xml'),
+                "filename": "data/metadata/xml-test.xml",
+                "size": 17
+            },
+            {
+                "checksum": "md5:1963a365b400a214cf9b89354bcd6169",
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/metadata/json-test.json'),
+                "filename": "data/metadata/json-test.json",
+                "size": 24
+            },
+            {
+                "size": 11,
+                "checksum": "md5:652b054df498ace88fef9857785fce34",
+                "filename": "data/files/foobar2-renamed.txt",
+                "file_uuid": file2.id,
+                'path': tmp_archive_fs.getsyspath(
+                    'test/data/files/foobar2.txt'),
+            }
+        ]
+    }
+    BagItArchiver.get_bagit_metadata(sip2) == sip2_bagit_meta
