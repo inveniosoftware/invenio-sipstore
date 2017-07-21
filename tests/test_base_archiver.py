@@ -28,6 +28,8 @@ from __future__ import absolute_import, print_function
 
 from hashlib import md5
 
+from helpers import get_file
+
 from invenio_sipstore.api import SIP
 from invenio_sipstore.archivers import BaseArchiver
 from invenio_sipstore.models import SIPMetadataType
@@ -85,11 +87,10 @@ def test_base_archiver_save_file(tmp_archive_fs):
     content = 'this is a content'
     result = archiver._save_file('test/file.txt', content)
     assert tmp_archive_fs.isfile('test/file.txt')
-    assert len(result) == 1
-    assert 'test/file.txt' in result
-    assert result['test/file.txt']['size'] == len(content)
-    assert calculate_md5(tmp_archive_fs, 'test/file.txt') \
-        in result['test/file.txt']['checksum']
+    assert result['filename'] == 'test/file.txt'
+    assert result['size'] == len(content)
+    assert 'md5:' + calculate_md5(tmp_archive_fs, 'test/file.txt') \
+        == result['checksum']
 
 
 def test_base_archiver_copy_files(sip_with_file, tmp_archive_fs):
@@ -100,10 +101,10 @@ def test_base_archiver_copy_files(sip_with_file, tmp_archive_fs):
     result = archiver._copy_files(sip.files, 'test')
     assert tmp_archive_fs.isfile('test/foobar.txt')
     assert len(result) == 1
-    assert 'test/foobar.txt' in result
-    assert result['test/foobar.txt']['size'] == len('test')
-    assert calculate_md5(tmp_archive_fs, 'test/foobar.txt') \
-        in result['test/foobar.txt']['checksum']
+    assert any('test/foobar.txt' == f['filename'] for f in result)
+    # assert result['test/foobar.txt']['size'] == len('test')
+    assert 'md5:' + calculate_md5(tmp_archive_fs, 'test/foobar.txt') \
+        == get_file('test/foobar.txt', result)['checksum']
 
 
 def test_base_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
@@ -120,12 +121,12 @@ def test_base_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
     path = archiver.path
     assert tmp_archive_fs.isdir(path)
     # create
-    result = archiver.create(filesdir="files", metadatadir="meth")
-    assert tmp_archive_fs.isfile('test/meth/json-test.json')
+    result = archiver.create(filesdir="files", metadatadir="meta")
+    assert tmp_archive_fs.isfile('test/meta/json-test.json')
     assert tmp_archive_fs.isfile('test/files/foobar.txt')
     assert len(result) == 2
-    assert 'meth/json-test.json' in result
-    assert 'files/foobar.txt' in result
+    assert get_file('meta/json-test.json', result)
+    assert get_file('files/foobar.txt', result)
     # finalize
     archiver.finalize()
     assert archiver.path == ''
