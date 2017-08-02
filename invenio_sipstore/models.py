@@ -275,3 +275,7 @@ class RecordSIP(db.Model, Timestamp):
     #
     sip = db.relationship(SIP, backref='record_sips', foreign_keys=[sip_id])
     """Relation to the SIP associated with the record."""
+
+    pid = db.relationship(PersistentIdentifier, backref='record_sips',
+                          foreign_keys=[pid_id])
+    """Relation to the PID associated with the record SIP."""
