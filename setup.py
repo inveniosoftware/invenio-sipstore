@@ -68,7 +68,7 @@ install_requires = [
     'invenio-accounts>=1.0.0b5',
     'invenio-pidstore>=1.0.0b1',
     'invenio-jsonschemas>=1.0.0a4',
-    'invenio-files-rest>=1.0.0a17',
+    'invenio-files-rest>=1.0.0a18',
     'jsonschema>=2.6.0',
 ]
 
@@ -103,6 +103,9 @@ setup(
             'invenio_sipstore = invenio_sipstore:alembic',
         ],
         'invenio_base.apps': [
+            'invenio_sipstore = invenio_sipstore:InvenioSIPStore',
+        ],
+        'invenio_base.api_apps': [
             'invenio_sipstore = invenio_sipstore:InvenioSIPStore',
         ],
         'invenio_jsonschemas.schemas': [

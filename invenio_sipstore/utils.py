@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016 CERN.
+# Copyright (C) 2017 CERN.
 #
 # Invenio is free software; you can redistribute it
 # and/or modify it under the terms of the GNU General Public License as
@@ -22,23 +22,32 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
+"""SIPStore utility functions."""
 
-"""Minimal Flask application example for development.
+import six
+from flask import current_app
+from werkzeug.utils import import_string
 
-Run example development server:
 
-.. code-block:: console
+def obj_or_import_string(value, default=None):
+    """Import string or return object.
 
-   $ cd examples
-   $ flask -a app.py --debug run
-"""
+    :params value: Import path or class object to instantiate.
+    :params default: Default object to return if the import fails.
+    :returns: The imported object.
+    """
+    if isinstance(value, six.string_types):
+        return import_string(value)
+    elif value:
+        return value
+    return default
 
-from __future__ import absolute_import, print_function
 
-from flask import Flask
+def load_or_import_from_config(key, app=None, default=None):
+    """Load or import value from config.
 
-from invenio_sipstore import InvenioSIPStore
-
-# Create Flask application
-app = Flask(__name__)
-InvenioSIPStore(app)
+    :returns: The loaded value.
+    """
+    app = app or current_app
+    imp = app.config.get(key)
+    return obj_or_import_string(imp, default=default)

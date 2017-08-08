@@ -25,11 +25,11 @@
 API Docs
 ========
 
-invenio_sipstore
-----------------
+Extension
+---------
 
 .. automodule:: invenio_sipstore.ext
-   :members:
+    :members:
 
 API
 ---
@@ -43,20 +43,61 @@ Models
 .. automodule:: invenio_sipstore.models
     :members:
 
+
+Errors
+------
+
+.. automodule:: invenio_sipstore.errors
+    :members:
+
+Proxies
+-------
+
+.. automodule:: invenio_sipstore.proxies
+    :members:
+
+
+Signals
+-------
+
+.. automodule:: invenio_sipstore.signals
+    :members:
+
+Utilities
+---------
+
+.. automodule:: invenio_sipstore.utils
+    :members:
+
+
+.. automodule:: invenio_sipstore.archivers.utils
+    :members:
+
+
 Archivers
 ---------
 
 .. automodule:: invenio_sipstore.archivers
     :members:
 
-BaseArchiver
-++++++++++++
+Base archiver
++++++++++++++
 
 .. automodule:: invenio_sipstore.archivers.base_archiver
     :members:
+    :private-members:
 
-BagItArchiver
-+++++++++++++
+BagIt archiver
+++++++++++++++
 
 .. automodule:: invenio_sipstore.archivers.bagit_archiver
     :members:
+    :private-members:
+
+
+Admin
+-----
+
+.. automodule:: invenio_sipstore.admin
+    :members:
+

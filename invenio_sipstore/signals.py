@@ -49,13 +49,11 @@ Example subscriber
 sipstore_archiver_status = _signals.signal('sipstore_archiver_status')
 """Signal sent during the archiving processing.
 
-Sends a dict with the following informations inside:
+Sends a dict with the following information inside:
 - total_files: the total number of files to copy
 - total_size: the total size to copy
 - copied_files: the number of copied files
 - copied_size: the size copied
 - current_filename: the name of the last copied file
 - current_filesize: the size of the last copied file
-
-See :py:func:`invenio_sipstore.archivers.BaseArchiver._copy_files`.
 """

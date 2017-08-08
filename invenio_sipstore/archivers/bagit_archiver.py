@@ -25,14 +25,10 @@
 """Archivers for SIP."""
 
 import json
-from copy import deepcopy
 from datetime import datetime
 
 from flask import current_app
-from fs.path import join
 from invenio_db import db
-from invenio_jsonschemas.errors import JSONSchemaNotFound
-
 from jsonschema import validate
 
 from invenio_sipstore.archivers import BaseArchiver
@@ -41,145 +37,244 @@ from invenio_sipstore.models import SIPMetadata, SIPMetadataType, \
 
 
 class BagItArchiver(BaseArchiver):
-    """BagIt archiver for SIP files."""
+    """BagIt archiver for SIPs.
 
-    # Name of the SIPMetadataType for internal use of BagItArchiver
+    Archives the SIP in the BagIt archive format (v0.97). For more information
+    on the BagIt standard visit: https://tools.ietf.org/html/draft-kunze-bagit
+    """
+
     bagit_metadata_type_name = 'bagit'
+    """Name of the SIPMetadataType for internal use of BagItArchiver."""
 
-    def __init__(self, sip, tags=None):
-        """Constuctor.
+    archiver_version = 'SIPBagIt-v1.0.0'
+    """Specification of the SIP bag structure.
+
+    This name will be formatted as ``External-Identifier`` tag::
+
+        External-Identifier: <SIP.id>/<archiver_version>
+    """
+
+    def __init__(self, sip, data_dir='data/files',
+                 metadata_dir='data/metadata', extra_dir='', patch_of=None,
+                 include_all_previous=False, tags=None,
+                 filenames_mapping_file='data/filenames.txt'):
+        """Constructor of the BagIt Archiver.
+
+        When specifying 'patch_of' parameter the 'include_all_previous'
+        flag determines whether files that are missing in the archived SIP
+        (w.r.t. the SIP specified in 'patch_of') should be treated as
+        explicitly deleted (include_all_previous=False) or if they
+        should still be included in the manifest.
+
+        Example:
+            include_all_previous = True
+              SIP_1:
+                SIPFiles: a.txt, b.txt
+                BagIt Manifest: a.txt, b.txt
+              SIP_2 (Bagged with patch_of=SIP_1):
+                SIPFiles: b.txt, c.txt
+                BagIt Manifest: a.txt, b.txt, c.txt
+                fetch.txt: a.txt, b.txt
+
+            include_all_previous = False
+              SIP_1:
+                SIPFiles: a.txt, b.txt
+                BagIt Manifest: a.txt, b.txt
+              SIP_2 (Bagged with patch_of=SIP_1):
+                SIPFIles: b.txt, c.txt
+                BagIt Manifest: b.txt, c.txt
+                fetch.txt: b.txt
 
         :param sip: API instance of the SIP that is to be archived.
         :type sip: invenio_sipstore.api.SIP
-        :param dict tags: a dictionnary for the tags of the bagit
+        :param data_dir: directory where the SIPFiles will be written.
+        :param metadata_dir: directory where the SIPMetadata will be written.
+        :param extra_dir: directory where all extra files will be written,
+            including the BagIt-specific files.
+        :param patch_of: Write a 'lightweight' bag, which will archive only
+            the new SIPFiles, and refer to the repeated ones in "fetch.txt"
+            file. The provided argument is a SIP API, which will be taken as a
+            base for determining the "diff" between two bags.
+        :type patch_of: invenio_sipstore.models.SIP or None
+        :type bool include_missing_files: If set to True and if 'patch_of' is
+            used, include the files that are missing in the SIP w.r.t. to
+            the 'patch_of' SIP in the manifest.
+            The opposite (include_missing_files=False) is equivalent to
+            treating those as explicitly deleted - the files will not be
+            included in the manifest, nor in the "fetch.txt" file.
+        :param tags: a list of 2-tuple containing the tags of the bagit,
+            which will be written to the 'bag-info.txt' file.
+        :param filenames_mapping_file: filepath of the file in the archive
+            which contains all of SIPFile mappings. If this parameter is
+            boolean-resolvable as False, the file will not be created.
         """
-        super(BagItArchiver, self).__init__(sip)
-        self.tags = tags or {}
+        super(BagItArchiver, self).__init__(
+            sip, data_dir=data_dir, metadata_dir=metadata_dir,
+            extra_dir=extra_dir, filenames_mapping_file=filenames_mapping_file)
+        self.tags = tags or current_app.config['SIPSTORE_BAGIT_TAGS']
+        self.patch_of = patch_of
+        self.include_all_previous = include_all_previous
 
-    # overrides BaseArchiver.get_all_files()
-    def get_all_files(self):
-        """Return the complete list of files in the archive.
-
-        All the files + all the metadata + bagit information.
-
-        :return: the list of all relative final path
-        """
-        files = super(BagItArchiver, self).get_all_files()
-        return files + ['manifest-md5.txt', 'bagit.txt', 'bag-info.txt',
-                        'tagmanifest-md5.txt']
+    @staticmethod
+    def _is_fetched(file_info):
+        """Determine if file info specifies a file that is fetched."""
+        return 'fetched' in file_info and file_info['fetched']
 
     @classmethod
-    def get_bagit_metadata_type(cls):
-        """Property for the metadata type for BagIt generation."""
+    def _get_bagit_metadata_type(cls):
+        """Return the SIPMetadataType for the BagIt metadata files."""
         return SIPMetadataType.get_from_name(cls.bagit_metadata_type_name)
 
     @classmethod
-    def get_bagit_metadata(cls, sip):
-        """Fetch the BagIt metadata information.
+    def get_bagit_metadata(cls, sip, as_dict=False):
+        """Fetch the BagIt metadata information (SIPMetadata).
 
         :param sip: SIP for which to fetch the metadata.
 
         :returns: Return the BagIt metadata information (SIPMetadata) instace
             or None if the object does not exist.
         """
-        return SIPMetadata.query.filter_by(
+        sm = SIPMetadata.query.filter_by(
             sip_id=sip.id,
-            type_id=cls.get_bagit_metadata_type().id).one_or_none()
+            type_id=cls._get_bagit_metadata_type().id).one_or_none()
+        if sm and as_dict:
+            return json.loads(sm.content)
+        else:
+            return sm
 
-    @classmethod
-    def get_bagit_metadata_json(cls, sip):
-        """Get the JSON (dict) of the associated BagIt metadata.
+    def get_bagit_file(self):
+        """Create the bagit.txt file which specifies the version and encoding.
 
-        Shortcut method for loading the JSON directly from the associated
-        SIPMetadata object.
+        :return: File information dictionary
+        :rtype: dict
         """
-        bagit_meta = cls.get_bagit_metadata(sip)
-        if bagit_meta:
-            return json.loads(bagit_meta.content)
-        else:
-            return None
+        content = 'BagIt-Version: 0.97\nTag-File-Character-Encoding: UTF-8'
+        return self._generate_extra_info(content, 'bagit.txt')
 
-    def _is_fetched(self, file_info):
-        """Determine if file info specifies a file that is fetched."""
-        return 'fetched' in file_info and file_info['fetched']
+    def get_fetch_file(self, filesinfo):
+        """Generate the contents of the fetch.txt file."""
+        content = '\n'.join('{0} {1} {2}'.format(f['fullpath'], f['size'],
+                                                 f['filepath'])
+                            for f in filesinfo)
+        return self._generate_extra_info(content, 'fetch.txt')
 
-    def create_bagit_metadata(
-            self, patch_of=None, include_missing_files=False,
-            filesdir='data/files', metadatadir='data/metadata'):
+    def _generate_md5manifest_content(self, filesinfo):
+        content = '\n'.join('{0} {1}'.format(self._get_checksum(
+                   f['checksum']), f['filepath']) for f in filesinfo)
+        return content
+
+    def get_manifest_file(self, filesinfo):
+        """Create the manifest file specifying the checksum of the files.
+
+        :return: the name of the file and its content
+        :rtype: tuple
+        """
+        content = self._generate_md5manifest_content(filesinfo)
+        return self._generate_extra_info(content, 'manifest-md5.txt')
+
+    def _generate_payload_oxum(self, filesinfo):
+        return "{0}.{1}".format(
+            sum([f['size'] for f in filesinfo]),
+            len(filesinfo)
+        )
+
+    def _generate_bagging_date(self):
+        """Generate the bagging date timestamp."""
+        return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    def get_baginfo_file(self, filesinfo):
+        """Create the bag-info.txt file from the tags."""
+        # Include some auto-generated tags
+        content = []
+        for t_name, t_value in self.tags:
+            if t_name == 'Payload-Oxum':
+                t_value = self._generate_payload_oxum(filesinfo)
+            elif t_name == 'Bagging-Date':
+                t_value = self._generate_bagging_date()
+            elif t_name == 'External-Identifier' and t_value is None:
+                t_value = '{0}/{1}'.format(self.sip.id, self.archiver_version)
+            content.append("{0}: {1}".format(t_name, t_value))
+
+        content = "\n".join(content)
+        return self._generate_extra_info(content, 'bag-info.txt')
+
+    def get_tagmanifest_file(self, filesinfo):
+        """Create the tagmanifest file using the files info.
+
+        :return: the name of the file and its content
+        :rtype: tuple
+        """
+        content = self._generate_md5manifest_content(filesinfo)
+        return self._generate_extra_info(content, 'tagmanifest-md5.txt')
+
+    def get_all_files(self):
         """Create the BagIt metadata object."""
-        sip_data_files = []  # Record's data + Record metadata dumps
+        data_files = self._get_data_files()
+        if self.patch_of:
+            prev_data_files = [fi for fi in self.get_bagit_metadata(
+                self.patch_of, as_dict=True)['files'] if 'file_uuid' in fi]
+            # We need to determine which files are to be fetched and
+            # which need to be written down to the archive
 
-        sipfiles = self.sip.files
-        if patch_of:
-            sipfiles = []  # We select SIPFiles for writing manually
-            prev_files = self.get_bagit_metadata_json(patch_of)['datafiles']
+            # Helper mapping of UUID-tu-Data-Fileinfo
+            id2df = dict((fi['file_uuid'], fi) for fi in data_files)
+            # Helper mapping of UUID-tu-Previous-Data-Fileinfo
+            id2pdf = dict((fi['file_uuid'], fi) for fi in prev_data_files)
 
-            # Helper mappings
-            # File UUID-to-manifest-item mapping (select only the data files,
-            # not the metadata).
-            id2mi = dict((f['file_uuid'], f) for f in
-                         prev_files if 'file_uuid' in f)
-            # File UUID-to-SIP File mapping
-            id2sf = dict((str(file.file.id), file) for file in self.sip.files)
-
-            manifest_files_s = set(id2mi.keys())
-            sip_files_s = set(id2sf.keys())
-            if include_missing_files:
-                fetched_uuids = manifest_files_s
+            # Create sets for easier set operations
+            pdf_s = set(id2pdf.keys())
+            df_s = set(id2df.keys())
+            # If all previous files are included, simply assume that all
+            # previous files are to be fetched (pdf_s), as it's the most
+            # optimal solution, otherwise take the union of old and new files
+            # only (pdf_s & df_s)
+            if self.include_all_previous:
+                fetched_uuids = pdf_s
             else:
-                fetched_uuids = manifest_files_s & sip_files_s
-            stored_uuids = sip_files_s - manifest_files_s
+                fetched_uuids = pdf_s & df_s
 
+            # Archived (written to disk) files are then only the strictly
+            # new files, i.e.: data files minus the previous data
+            # files (df_s - pdf_s)
+            archived_uuids = df_s - pdf_s
+
+            data_files = []   # We will build the list of data files again
             for uuid in fetched_uuids:
-                fi = deepcopy(id2mi[uuid])
-                if uuid in id2sf:
-                    filename = join(filesdir, id2sf[uuid].filepath)
-                else:
-                    filename = id2mi[uuid]['filename']
-                fi['filename'] = filename
+                fi = id2pdf[uuid]
+                # If the file is attached to the new SIP, use the new filepath
+                fi['filepath'] = id2df[uuid]['filepath'] if uuid in id2df \
+                    else fi['filepath']
                 fi['fetched'] = True
-                sip_data_files.append(fi)
+                data_files.append(fi)
+            for uuid in archived_uuids:
+                data_files.append(id2df[uuid])
 
-            for uuid in stored_uuids:
-                sipfiles.append(id2sf[uuid])
+        metadata_files = self._get_metadata_files()
+        extra_files = self._get_extra_files(data_files, metadata_files)
 
-        # Copy the files
-        files_info = super(BagItArchiver, self).create(
-            filesdir=filesdir, metadatadir=metadatadir, sipfiles=sipfiles,
-            dry_run=True)
-        sip_data_files.extend(files_info)
-        # Add the files from fetch.txt to the files_info dictionary,
-        # so they will be included in generated manifest-md5.txt file
+        bagit_files = []
+        fetched_fi = [fi for fi in data_files if self._is_fetched(fi)]
+        if fetched_fi:
+            bagit_files.append(self.get_fetch_file(fetched_fi))
+        bagit_files.append(self.get_baginfo_file(data_files + metadata_files +
+                                                 extra_files))
+        bagit_files.append(self.get_manifest_file(data_files + metadata_files +
+                                                  extra_files))
+        bagit_files.append(self.get_bagit_file())
+        bagit_files.append(self.get_tagmanifest_file(bagit_files))
 
-        self.autogenerate_tags(files_info)
+        return data_files + metadata_files + extra_files + bagit_files
 
-        # Generate the BagIt metadata files (manifest-md5.txt, bagit.txt etc.)
-        bagit_meta_files = []
-        if any(self._is_fetched(fi) for fi in sip_data_files):
-            funcs = [((self.get_fetch_file, (sip_data_files, ), )), ]
-        else:
-            funcs = []
-        funcs.extend([
-            (self.get_manifest_file, (sip_data_files, ), ),
-            (self.get_bagit_file, (), ),
-            (self.get_baginfo_file, (), ),
-            (self.get_tagmanifest, (bagit_meta_files, ), ),  # Needs to be last
-        ])
-
-        for func, args in funcs:
-            fn, content = func(*args)
-            fi = self._save_file(fn, content, dry_run=True)
-            fi['content'] = content
-            bagit_meta_files.append(fi)
-
+    def save_bagit_metadata(self, filesinfo=None):
+        """Generate and save the BagIt metadata information as SIPMetadata."""
+        if not filesinfo:
+            filesinfo = self.get_all_files()
         bagit_schema = current_jsonschemas.path_to_url(
             current_app.config['SIPSTORE_DEFAULT_BAGIT_JSONSCHEMA'])
         bagit_metadata = {
-            'datafiles': sip_data_files,
-            'bagitfiles': bagit_meta_files,
+            'files': filesinfo,
             '$schema': bagit_schema,
         }
-
         # Validate the BagIt metadata with JSONSchema
         schema_path = current_jsonschemas.url_to_path(bagit_schema)
         schema = current_jsonschemas.get_schema(schema_path)
@@ -189,141 +284,22 @@ class BagItArchiver(BaseArchiver):
         with db.session.begin_nested():
             obj = SIPMetadata(
                 sip_id=self.sip.id,
-                type_id=BagItArchiver.get_bagit_metadata_type().id,
+                type_id=BagItArchiver._get_bagit_metadata_type().id,
                 content=json.dumps(bagit_metadata))
             db.session.add(obj)
 
-    def create(self, patch_of=None, include_missing_files=False,
-               filesdir="data/files", metadatadir="data/metadata"):
-        """Archive the SIP generating a BagIt file.
-
-        When specifying 'patch_of' parameter the 'include_missing_files'
-        flag determines whether files that are missing in the archived SIP
-        (w.r.t. the SIP specified in 'patch_of') should be treated as
-        explicitly deleted (include_missing_files=False) or if they
-        should still be included in the manifest.
-
-        Example:
-            include_missing_files = True
-              SIP_1:
-                SIPFiles: a.txt, b.txt
-                BagIt Manifest: a.txt, b.txt
-              SIP_2 (Bagged with patch_of=SIP_1):
-                SIPFiles: b.txt, c.txt
-                BagIt Manifest: a.txt, b.txt, c.txt
-                fetch.txt: a.txt, b.txt
-
-            include_missing_files = False
-              SIP_1:
-                SIPFiles: a.txt, b.txt
-                BagIt Manifest: a.txt, b.txt
-              SIP_2 (Bagged with patch_of=SIP_1):
-                SIPFIles: b.txt, c.txt
-                BagIt Manifest: b.txt, c.txt
-                fetch.txt: b.txt
-
-        :param bool create_bagit_metadata: At the end of archiving,
-            create a SIPMetadata object for this SIP, which
-            will contain the metadata of the BagIt contents.
-            It is necessary to bag the SIPs with this option enabled, if
-            one wants to make use of 'patch_of' later on.
-        :param patch_of: Write a lightweight BagIt, which will archive only
-            the new files, and refer to the repeated ones in "fetch.txt" file.
-            The provided argument is a SIP, which will be taken as a base
-            for determining the "diff" between two bags.
-            Provided SIP needs to have a special 'bagit'-named SIPMetadata
-            object associated with it, i.e. it had to have been previously
-            archived with the 'create_bagit_metadata' flag.
-        :type patch_of: invenio_sipstore.models.SIP or None
-        :type bool include_missing_files: If set to True and if 'patch_of' is
-            used, include the files that are missing in the SIP w.r.t. to
-            the 'patch_of' SIP in the manifest.
-            The opposite (include_missing_files=False) is equivalent to
-            treating those as explicitly deleted - the files will not be
-            included in the manifest, nor in the "fetch.txt" file.
-        :returns: a dictionary with the filenames as keys, and size and
-            checksum as value
-        :rtype: dict
-        """
-        bagit_meta = self.get_bagit_metadata_json(self.sip)
+    def write_all_files(self):
+        """Write all of the archived files to the archive file system."""
+        bagit_meta = self.get_bagit_metadata(self.sip, as_dict=True)
         if not bagit_meta:
-            self.create_bagit_metadata(
-                patch_of=patch_of, include_missing_files=include_missing_files,
-                filesdir=filesdir, metadatadir=metadatadir)
-            bagit_meta = self.get_bagit_metadata_json(self.sip)
+            all_files = self.get_all_files()
+            self.save_bagit_metadata(all_files)
+            bagit_meta = self.get_bagit_metadata(self.sip, as_dict=True)
 
-        archived_data = [fi for fi in bagit_meta['datafiles']
-                         if not self._is_fetched(fi) and 'file_uuid' in fi]
-        fetched_data = [fi for fi in bagit_meta['datafiles']
-                        if self._is_fetched(fi)]
-        archived_s = set([f['file_uuid'] for f in archived_data])
-
-        # Create a set for fetching
-        sipfiles = [f for f in self.sip.files if str(f.file.id) in archived_s]
-        files_info = super(BagItArchiver, self).create(
-            filesdir=filesdir, metadatadir=metadatadir, sipfiles=sipfiles)
-
-        files_info.extend(fetched_data)
-
-        for fi in bagit_meta['bagitfiles']:
-            out_fi = self._save_file(fi['filename'], fi['content'])
-            assert fi['path'] == out_fi['path']
-            files_info.append(out_fi)
-
-        return files_info
-
-    def autogenerate_tags(self, files_info):
-        """Generate the automatic tags."""
-        self.tags['Bagging-Date'] = datetime.now().strftime(
-            "%Y-%m-%d_%H:%M:%S:%f")
-        self.tags['Payload-Oxum'] = '{0}.{1}'.format(
-            sum([f['size'] for f in files_info]), len(files_info))
-
-    def get_fetch_file(self, files_info):
-        """Generate the contents of the fetch.txt file."""
-        content = ('{0} {1} {2}'.format(f['path'], f['size'], f['filename'])
-                   for f in files_info if self._is_fetched(f))
-        return 'fetch.txt', '\n'.join(content)
-
-    def get_manifest_file(self, files_info):
-        """Create the manifest file specifying the checksum of the files.
-
-        :return: the name of the file and its content
-        :rtype: tuple
-        """
-        content = ('{0} {1}'.format(self._get_checksum(
-                   f['checksum']), f['filename']) for f in files_info)
-        return 'manifest-md5.txt', '\n'.join(content)
-
-    def get_bagit_file(self):
-        """Create the bagit file which specify the version and encoding.
-
-        :return: the name of the file and its content
-        :rtype: tuple
-        """
-        content = 'BagIt-Version: 0.97\nTag-File-Character-Encoding: UTF-8'
-        return 'bagit.txt', content
-
-    def get_baginfo_file(self):
-        """Create the baginfo file using the tags.
-
-        :return: the name of the file and its content
-        :rtype: tuple
-        """
-        content_items = ('{0}: {1}'.format(k, v)
-                         for k, v in self.tags.items())
-        content = '\n'.join(content_items)
-        return 'bag-info.txt', content
-
-    def get_tagmanifest(self, files_info):
-        """Create the tagmanifest file using the files info.
-
-        :return: the name of the file and its content
-        :rtype: tuple
-        """
-        files_info = [fi for fi in files_info if fi['filename']]
-        name, content = self.get_manifest_file(files_info)
-        return 'tagmanifest-md5.txt', content
+        write_filesinfo = [fi for fi in bagit_meta['files']
+                           if not self._is_fetched(fi)]
+        return super(BagItArchiver, self).write_all_files(
+            filesinfo=write_filesinfo)
 
     @staticmethod
     def _get_checksum(checksum, expected='md5'):

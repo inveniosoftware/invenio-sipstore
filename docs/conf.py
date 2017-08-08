@@ -310,8 +310,8 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   (master_doc, 'invenio-sipstore', u'Invenio-SIPStore Documentation',
-   author, 'invenio-sipstore', 'Submission Information Package store for Invenio.',
-   'Miscellaneous'),
+   author, 'invenio-sipstore',
+   'Submission Information Package store for Invenio.', 'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.
@@ -330,9 +330,12 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/', None),
-    'invenio_files_rest': ('https://invenio-files-rest.readthedocs.io/en/latest/', None),
-    'invenio_pidstore': ('https://invenio-pidstore.readthedocs.io/en/latest/', None),
-    'invenio_records': ('https://invenio-records.readthedocs.io/en/latest/', None),
+    'invenio_files_rest': (
+        'https://invenio-files-rest.readthedocs.io/en/latest/', None),
+    'invenio_pidstore': (
+        'https://invenio-pidstore.readthedocs.io/en/latest/', None),
+    'invenio_records': (
+        'https://invenio-records.readthedocs.io/en/latest/', None),
 }
 
 # Autodoc configuraton.

@@ -28,106 +28,159 @@ from __future__ import absolute_import, print_function
 
 from hashlib import md5
 
-from helpers import get_file
+from six import b
 
-from invenio_sipstore.api import SIP
 from invenio_sipstore.archivers import BaseArchiver
-from invenio_sipstore.models import SIPMetadataType
 
 
-def calculate_md5(fs, filename):
-    """Calculate the MD5 of the content of a file."""
-    with fs.open(filename) as fp:
-        return md5(fp.read().encode('utf-8')).hexdigest()
-
-
-def test_base_archiver_getters(db, sip_with_file):
+def test_getters(db, sips, sip_metadata_types, locations):
     """Test the constructor and the getters."""
-    sip = SIP(sip_with_file)
-    # constructor
+    sip = sips[0]
     archiver = BaseArchiver(sip)
+    assert archiver._get_archive_base_uri() == locations['archive'].uri
     assert archiver.sip is sip
-    # get files
-    file = sip.files[0]
-    files = archiver.get_files()
-    assert len(files) == 1
-    assert file.filepath in files
-    assert files[file.filepath] == file.storage_location
-    # get metadata
-    mjson = SIPMetadataType(title='JSON Test', name='json-test',
-                            format='json', schema='url')
-    marcxml = SIPMetadataType(title='MARC XML Test', name='marcxml-test',
-                              format='xml', schema='uri')
-    db.session.add(mjson)
-    db.session.add(marcxml)
-    sip.attach_metadata('marcxml-test', '<this>is xml</this>')
-    sip.attach_metadata('json-test', '{"title": "json"}')
-    db.session.commit()
-    metadata = archiver.get_metadata()
-    assert len(metadata) == 2
-    assert 'json-test.json' in metadata
-    assert 'marcxml-test.xml' in metadata
-    assert metadata['json-test.json'] == '{"title": "json"}'
-    # all files
-    assert len(archiver.get_all_files()) == len(metadata) + len(files)
+    # get data files
+    data_files_info = archiver._get_data_files()
+    sip_id = str(sip.id)
+    abs_path_fmt = "{root}/{c1}/{c2}/{cn}/".format(
+        root=locations['archive'].uri, c1=sip_id[:2], c2=sip_id[2: 4],
+        cn=sip_id[4:]) + "{filepath}"
+    abs_path = abs_path_fmt.format(filepath="files/foobar.txt")
+    fi = {
+        'file_uuid': str(sip.files[0].file_id),
+        'filepath': 'files/foobar.txt',
+        'filename': 'foobar.txt',
+        'sipfilepath': 'foobar.txt',
+        'size': 4,
+        'fullpath': abs_path,
+        'checksum': 'md5:098f6bcd4621d373cade4e832627b4f6'
+    }
+    assert data_files_info == [fi, ]
+
+    metafiles_info = archiver._get_metadata_files()
+    assert len(metafiles_info) == 2
+    m1_abs_path = abs_path_fmt.format(filepath="metadata/json-test.json")
+    m2_abs_path = abs_path_fmt.format(
+        filepath="metadata/marcxml-test.xml")
+    m1 = {
+        'checksum': 'md5:da4ab7e4c4b762d8e2f3ec3b9f801b1f',
+        'fullpath': m1_abs_path,
+        'metadata_id': sip_metadata_types['json-test'].id,
+        'filepath': 'metadata/json-test.json',
+        'size': 19
+    }
+    m2 = {
+        'checksum': 'md5:498d1ce86c2e9b9eb85f1e8105affdf6',
+        'fullpath': m2_abs_path,
+        'metadata_id': sip_metadata_types['marcxml-test'].id,
+        'filepath': 'metadata/marcxml-test.xml',
+        'size': 12
+    }
+    assert m1 in metafiles_info
+    assert m2 in metafiles_info
+
+    all_files_info = archiver.get_all_files()
+    assert len(all_files_info) == 3
+    assert fi in all_files_info
+    assert m1 in all_files_info
+    assert m2 in all_files_info
 
 
-def test_base_archiver_create_directories(tmp_archive_fs):
-    """Test the _create_directories function."""
-    archiver = BaseArchiver(None)
-    archiver.fs = tmp_archive_fs
-    archiver._create_directories('lol/test')
-    assert tmp_archive_fs.exists('lol/test/')
-
-
-def test_base_archiver_save_file(tmp_archive_fs):
-    """Test the _save_file function."""
-    archiver = BaseArchiver(None)
-    archiver.fs = tmp_archive_fs
-    content = 'this is a content'
-    result = archiver._save_file('test/file.txt', content)
-    assert tmp_archive_fs.isfile('test/file.txt')
-    assert result['filename'] == 'test/file.txt'
-    assert result['size'] == len(content)
-    assert 'md5:' + calculate_md5(tmp_archive_fs, 'test/file.txt') \
-        == result['checksum']
-
-
-def test_base_archiver_copy_files(sip_with_file, tmp_archive_fs):
-    """Test the _copy_files function."""
-    sip = SIP(sip_with_file)
+def test_write(db, sips, sip_metadata_types, locations, archive_fs):
+    """Test writing of the SIPFiles and SIPMetadata files to archive."""
+    sip = sips[0]
     archiver = BaseArchiver(sip)
-    archiver.fs = tmp_archive_fs
-    result = archiver._copy_files(sip.files, 'test')
-    assert tmp_archive_fs.isfile('test/foobar.txt')
-    assert len(result) == 1
-    assert any('test/foobar.txt' == f['filename'] for f in result)
-    # assert result['test/foobar.txt']['size'] == len('test')
-    assert 'md5:' + calculate_md5(tmp_archive_fs, 'test/foobar.txt') \
-        == get_file('test/foobar.txt', result)['checksum']
+    data_files_info = archiver._get_data_files()
+    assert not archive_fs.listdir()  # Empty archive
+    archiver._write_sipfile(data_files_info[0])
+    assert len(archive_fs.listdir()) == 1
+    fs = archive_fs.opendir(archiver._get_archive_subpath())
+    assert fs.isfile('files/foobar.txt')
+
+    assert not fs.isfile('metadata/json-test.json')
+    assert not fs.isfile('metadata/marcxml-test.xml')
+    metadata_files_info = archiver._get_metadata_files()
+    archiver._write_sipmetadata(metadata_files_info[0])
+    archiver._write_sipmetadata(metadata_files_info[1])
+    assert fs.isfile('metadata/json-test.json')
+    assert fs.isfile('metadata/marcxml-test.xml')
+
+    assert not fs.isfile('test.txt')
+    archiver._write_extra(content='test raw content', filename='test.txt')
+    assert fs.isfile('test.txt')
+    with fs.open('test.txt', 'r') as fp:
+        cnt = fp.read()
+    assert cnt == 'test raw content'
+
+    assert not fs.isfile('test2.txt')
+    extra_file_info = dict(
+        checksum=('md5:' + str(md5('test'.encode('utf-8')).hexdigest())),
+        size=len('test'),
+        filepath='test2.txt',
+        fullpath=fs.getsyspath('test2.txt'),
+        content='test'
+    )
+    archiver._write_extra(fileinfo=extra_file_info)
+    assert fs.isfile('test.txt')
+    with fs.open('test.txt', 'r') as fp:
+        cnt = fp.read()
+    assert cnt == 'test raw content'
 
 
-def test_base_archiver_create_archive(db, sip_with_file, tmp_archive_fs):
-    """Test the functions used to create an export of the SIP."""
-    sip = SIP(sip_with_file)
-    mtype = SIPMetadataType(title='JSON Test', name='json-test',
-                            format='json', schema='url://to/schema')
-    db.session.add(mtype)
-    sip.attach_metadata('json-test', '{"title": "json"}')
-    db.session.commit()
+def test_write_all(db, sips, sip_metadata_types, locations, archive_fs):
+    """Test the public "write_all_files" method."""
+    sip = sips[0]
     archiver = BaseArchiver(sip)
-    # init
-    archiver.init(tmp_archive_fs, 'test')
-    path = archiver.path
-    assert tmp_archive_fs.isdir(path)
-    # create
-    result = archiver.create(filesdir="files", metadatadir="meta")
-    assert tmp_archive_fs.isfile('test/meta/json-test.json')
-    assert tmp_archive_fs.isfile('test/files/foobar.txt')
-    assert len(result) == 2
-    assert get_file('meta/json-test.json', result)
-    assert get_file('files/foobar.txt', result)
-    # finalize
-    archiver.finalize()
-    assert archiver.path == ''
-    assert not tmp_archive_fs.exists(path)
+    assert not archive_fs.listdir()
+    archiver.write_all_files()
+    assert len(archive_fs.listdir()) == 1
+    fs = archive_fs.opendir(archiver._get_archive_subpath())
+    assert len(fs.listdir()) == 2
+    assert len(fs.listdir('metadata')) == 2
+    assert len(fs.listdir('files')) == 1
+    expected = {
+            ('metadata/marcxml-test.xml', '<p>XML 1</p>'),
+            ('metadata/json-test.json', '{"title": "JSON 1"}'),
+            ('files/foobar.txt', 'test'),
+    }
+    for fn, content in expected:
+        with fs.open(fn, 'r') as fp:
+            c = fp.read()
+        assert c == content
+
+
+def test_name_formatters(db, app, sips, sip_metadata_types, locations,
+                         archive_fs, secure_sipfile_name_formatter,
+                         custom_sipmetadata_name_formatter):
+    """Test archiving with custom filename formatter."""
+    sip = sips[3]  # SIP with some naughty filenames
+    archiver = BaseArchiver(sip, filenames_mapping_file='files/filenames.txt')
+    assert not archive_fs.listdir()
+    archiver.write_all_files()
+    assert len(archive_fs.listdir()) == 1
+    fs = archive_fs.opendir(archiver._get_archive_subpath())
+    assert set(fs.listdir()) == set(['metadata', 'files'])
+    assert len(fs.listdir('metadata')) == 2
+    # inside 'files/' there should be 'filenames.txt' file with the mappings
+    assert len(fs.listdir('files')) == 3
+    uuid1 = next(f.file.id for f in sip.files if f.filepath.endswith('txt'))
+    uuid2 = next(f.file.id for f in sip.files if f.filepath.endswith('js'))
+    expected = [
+            ('metadata/marcxml-test-metadata.xml', '<p>XML 4</p>'),
+            ('metadata/json-test-metadata.json', '{"title": "JSON 4"}'),
+            ('files/{0}-foobar.txt'.format(uuid1), 'test-fourth'),
+            ('files/{0}-http_maliciouswebsite.com_hack.js'.format(uuid2),
+             'test-fifth'),
+            ('files/filenames.txt', set(
+                ['{0}-foobar.txt ../../foobar.txt'.format(uuid1),
+                 '{0}-http_maliciouswebsite.com_hack.js '
+                 'http://maliciouswebsite.com/hack.js'.format(uuid2)]))
+
+    ]
+    for fn, content in expected:
+        with fs.open(fn, 'r') as fp:
+            if isinstance(content, set):  # Compare as set of lines
+                c = set(fp.read().splitlines())
+            else:
+                c = fp.read()
+        assert c == content

@@ -22,198 +22,384 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-"""Base Archiver class for SIP."""
+"""Base archiver for SIPs.
 
+The base archiver implements a basic API that allows subclasses to not having
+to worry about e.g. files to disk.
+"""
+
+import os
 from hashlib import md5
 
-from fs.opener import opener
-from fs.path import dirname, join
-from fs.utils import copyfile
-from six import b
+from flask import current_app
+from invenio_files_rest.models import FileInstance
+from six import BytesIO
 
-from invenio_sipstore.signals import sipstore_archiver_status
+from .. import current_sipstore
+from ..models import SIPMetadata
+from ..signals import sipstore_archiver_status
 
 
 class BaseArchiver(object):
-    """Base Archiver class for SIP.
+    """Base archiver.
 
-    You can either access the files from the archive via the different
-    getters, or generate the archive in a given folder via the following
-    methods:
+    The archiving is done in two steps:
 
-    - :func:`invenio_sipstore.archivers.base_archiver.BaseArchiver.init`
-    - :func:`invenio_sipstore.archivers.base_archiver.BaseArchiver.create`
-    - :func:`invenio_sipstore.archivers.base_archiver.BaseArchiver.finalize`
+    1. Generation of a list containing file information which contains all
+       relevant information for writing down each file.
+    2. Actual IO operation on the storage, which takes the previously generated
+       list as input and writes it down to disk.
+
+    The first step contains all archiver specific information on the archive
+    structure and all relevant archive metadata that is to be written in
+    addition to the "core" files, which are
+    :py:class:`~invenio_sipstore.models.SIPFile` and
+    :py:class:`~invenio_sipstore.models.SIPMetadata` files.
+
+    The first step does not produce any side effects to the system. Specific
+    archivers which inherit from this class are expected to primarily overwrite
+    the :py:data:`BaseArchiver.get_all_files()` method to implement the,
+    archiver-specific structure and any additional archived files.
+
+    Relevant public method:
+
+    * :py:data:`BaseArchiver.get_all_files()`
+
+    Relevant protected methods:
+
+    * :py:data:`BaseArchiver._get_data_files()`
+    * :py:data:`BaseArchiver._get_metadata_files()`
+    * :py:data:`BaseArchiver._get_extra_files()`
+
+    The second step writes down the generated file information to disk using
+    the configured storage class. By default it uses the file storage factory
+    specified in
+    :py:data:`~invenio_sipstore.config.SIPSTORE_FILE_STORAGE_FACTORY`
+    configuration variable. This behaviour is overwritable by
+    ``storage_factory`` parameter that can be provided to the constructor of
+    this class.
+
+    Relevant public method:
+
+    * :py:data:`BaseArchiver.write_all_files()`
+
+    Relevant protected methods:
+
+    * :py:data:`BaseArchiver._write_sipfile()`
+    * :py:data:`BaseArchiver._write_sipmetadata()`
+    * :py:data:`BaseArchiver._write_extra()`
     """
 
-    def __init__(self, sip):
-        """Constructor.
+    def __init__(self, sip, data_dir='files', metadata_dir='metadata',
+                 extra_dir='', storage_factory=None,
+                 filenames_mapping_file=None):
+        """Base archiver constructor.
 
-        :param sip: the SIP to archive
+        :param sip: the SIP to archive.
         :type sip: :py:class:`invenio_sipstore.api.SIP`
+        :param data_dir: Subdirectory in archive where the SIPFiles
+            will be written.
+        :param metadata_dir: Subdirectory in archive where the SIPMetadata
+            files will be written.
+        :param extra_dir: Subdirectory where all any extra files, that are
+            specific to an archive standard, should be written.
+        :param storage_factory: Storage factory used to create a new storage
+            class instance.
+        :param filenames_mapping_file: Mapping of file names.
         """
-        self.path = ""
-        self.fs = None
         self.sip = sip
+        self.data_dir = data_dir
+        self.metadata_dir = metadata_dir
+        self.extra_dir = extra_dir
+        self.storage_factory = storage_factory or \
+            current_sipstore.storage_factory
+        self.filenames_mapping_file = filenames_mapping_file
 
-    def get_files(self):
-        """Return all the files in the archive, but not the metadata.
+    def _get_archive_base_uri(self):
+        """Get the base URI (absolute path) for the archive location.
 
-        :return: a dict with final relative path as keys and current location
-            in Invenio as value
-        :rtype: dict
+        To configure the URI, specify the relevant configuration variable
+        :py:data:`~invenio_sipstore.config.SIPSTORE_ARCHIVER_LOCATION_NAME`,
+        with the name of the :py:class:`~invenio_files_rest.models.Location`
+        object which will be used as the archive base URI.
+
+        Returns the absolute path to the archive location, e.g.:
+
+        * ``/data/archive/``
+        * ``root://eospublic.cern.ch//eos/archive``
         """
-        return {f.filepath: f.storage_location
-                for f in self.sip.files}
+        return current_sipstore.archive_location
 
-    def get_metadata(self):
-        """Return the metadata.
+    def _get_archive_subpath(self):
+        """Generate the relative directory path of the archived SIP.
 
-        :return: a dict with final relative path as keys and content as value.
-        :rtype: dict
+        The behaviour of this method can be changed by changing the
+        :py:data:`~invenio_sipstore.config.SIPSTORE_ARCHIVER_DIRECTORY_BUILDER`
+        configuration variable.
+
+        Generates the relative directory path for the archived SIP, which
+        should be unique for given SIP and is usually built from the SIP
+        information and/or its assigned objects, e.g.:
+
+        * ``/ab/cd/ab12-abcd-1234-dcba-123412341234`` (3-level chunk of SIP
+          UUID identifier).
+        * ``/12345/r/5`` (/<PID value>/r/<record revision id>)
+
+        The return value of this method is a location that is *relative*
+        to the base archive URI, the full path that is constructed later
+        can be (based on examples from
+        :py:data:`BaseArchiver._get_archive_base_uri()`):
+
+        * ``/data/archive/ab/cd/ab12-abcd-1234-dcba-123412341234``
+        * ``root://eospublic.cern.ch//eos/archive/12345/r/5``
         """
-        return {m.type.name + '.' + m.type.format: m.content
-                for m in self.sip.metadata}
+        return os.path.join(*current_sipstore.archive_path_builder(self.sip))
+
+    def _get_fullpath(self, filepath):
+        """Generate the absolute (full path) to the file in the archive system.
+
+        :param filepath: path to the file, relative to archive subdirectory
+            e.g. ``data/myfile.dat``.
+        :type filepath: str
+        :return: Absolute path, e.g.
+            ``root://eospublic.cern.ch//eos/archive/12345/data/myfile.dat``
+        :rtype: str
+        """
+        return os.path.join(
+            self._get_archive_base_uri(),
+            self._get_archive_subpath(),
+            filepath
+        )
+
+    def _generate_sipfile_info(self, sipfile):
+        """Generate the file information dictionary from a SIP file."""
+        filename = current_sipstore.sipfile_name_formatter(sipfile)
+        filepath = os.path.join(self.data_dir, filename)
+        return dict(
+            checksum=sipfile.checksum,
+            size=sipfile.size,
+            filepath=filepath,
+            fullpath=self._get_fullpath(filepath),
+            file_uuid=str(sipfile.file_id),
+            filename=filename,
+            sipfilepath=sipfile.filepath,
+        )
+
+    def _generate_sipmetadata_info(self, sipmetadata):
+        """Generate the file information dictionary from a SIP metadata."""
+        filename = current_sipstore.sipmetadata_name_formatter(sipmetadata)
+        filepath = os.path.join(self.metadata_dir, filename)
+        return dict(
+            checksum='md5:{}'.format(str(
+                md5(sipmetadata.content.encode('utf-8')).hexdigest())),
+            size=len(sipmetadata.content),
+            filepath=filepath,
+            fullpath=self._get_fullpath(filepath),
+            metadata_id=sipmetadata.type_id,
+        )
+
+    def _generate_extra_info(self, content, filename):
+        """Generate the file information dictionary from a raw content."""
+        filepath = os.path.join(self.extra_dir, filename)
+        return dict(
+            checksum='md5:{}'.format(
+                    str(md5(content.encode('utf-8')).hexdigest())),
+            size=len(content),
+            filepath=filepath,
+            fullpath=self._get_fullpath(filepath),
+            content=content
+        )
+
+    def _get_sipfile_filename_mapping(self, filesinfo):
+        """Generate filename mapping for SIPFiles.
+
+        Due to archive file system specific issues, security reasons and
+        archive package portability reasons, one might want to write down
+        the SIP file under a different name than the one that was provided
+        in the system (often by the user). In that case it is important to
+        generate a mapping file between the original
+        :py:data:`invenio_sipstore.models.SIPFile.filepath` entries and the
+        archived filenames. It is important to include this mapping in the
+        archive if ``SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER`` was set to
+        anything other than the default formatter.
+
+        See ``default_sipfile_name_formatter()`` and
+        ``secure_sipfile_name_formatter()``.
+        """
+        content = '\n'.join(('{0} {1}'.format(f['filename'], f['sipfilepath'])
+                            for f in filesinfo))
+        return self._generate_extra_info(content, self.filenames_mapping_file)
+
+    def _get_data_files(self):
+        """Get the file information for all the data files.
+
+        The structure is defined by the JSON Schema
+        ``sipstore/file-v1.0.0.json``.
+
+        :return: list of dict containing file information.
+        """
+        files = []
+        for f in self.sip.files:
+            files.append(self._generate_sipfile_info(f))
+        return files
+
+    def _get_metadata_files(self):
+        """Get the file information for the metadata files.
+
+        The structure is defined by the JSON Schema
+        ``sipstore/file-v1.0.0.json``.
+
+        :return: list of dict containing file information.
+        """
+        # Consider only the explicitly-configured metadata types
+        m_names = current_app.config['SIPSTORE_ARCHIVER_METADATA_TYPES']
+        files = []
+        for m in self.sip.metadata:
+            if m.type.name in m_names:
+                files.append(self._generate_sipmetadata_info(m))
+        return files
+
+    def _get_extra_files(self, data_files, metadata_files):
+        """Get file information on any additional files in the archive.
+
+        Return any additional files that are to be written. If
+        ``filenames_mapping_file`` was set in the constructor, this method will
+        generate a file containing the SIP filenames mapping.
+
+        The structure is defined by the JSON Schema
+        ``sipstore/file-v1.0.0.json``.
+
+        :param data_files: File information on the SIP files.
+        :param metadata_files: File information on the SIP metadata files
+        :return: list of dict containing any additional files information.
+        """
+        ret = []
+        if self.filenames_mapping_file and data_files:
+            ret = [self._get_sipfile_filename_mapping(data_files), ]
+        return ret
 
     def get_all_files(self):
-        """Return the complete list of files in the archive.
-
-        All the files + all the metadata + some other files specific to the
-        archive type if necessary.
+        """Get the complete list of files in the archive.
 
         :return: the list of all relative final path
         """
-        return list(self.get_files()) + list(self.get_metadata())
+        data_files = self._get_data_files()
+        metadata_files = self._get_metadata_files()
+        extra_files = self._get_extra_files(data_files, metadata_files)
+        return data_files + metadata_files + extra_files
 
-    def init(self, fs, folder):
-        """Initialize the creation of the archive.
+    def _write_sipfile(self, fileinfo=None, sipfile=None):
+        """Write a SIP file to disk.
 
-        :param str fs: a filesystem where to create the archive.
-        :param str folder: the folder to create where will be stored the SIP.
+        ***Requires** either `fileinfo` or `sipfile` to be passed.
+
+        Parameter `fileinfo` with the file information
+        ('file_uuid' key required) or `sipfile` - the
+        :py:data:`~invenio_sipstore.models.SIPFile` instance, in which case the
+        relevant file information will be generated on the spot.
+
+        :param fileinfo: File information on the SIPFile that is to be written.
+        :type fileinfo: dict
+        :param sipfile: SIP file to be written.
+        :type sipfile: ``invenio_sipstore.models.SIPFile``
         """
-        self.fs = fs
-        self.path = folder
-        self._create_directories(folder)
+        assert fileinfo or sipfile
+        if not fileinfo:
+            fileinfo = self._generate_sipfile_info(sipfile)
+        if sipfile:
+            fi = sipfile.file
+        else:
+            fi = FileInstance.query.get(fileinfo['file_uuid'])
+        sf = self.storage_factory(fileurl=fileinfo['fullpath'],
+                                  size=fileinfo['size'],
+                                  modified=fi.updated)
+        return sf.copy(fi.storage())
 
-    def create(self, filesdir="", metadatadir="", sipfiles=None,
-               dry_run=False):
-        """Create the archive.
+    def _write_extra(self, fileinfo=None, content=None, filename=None):
+        """Write any extra file to the archive.
 
-        :param str filesdir: directory to which the data files will be written.
-        :param str metadatadir: directory to which the metadata files will be
-            written.
-        :param sipfiles: a list of SIPFile objects to write. By default
-            it's all of the SIPFiles attached to the SIP.
-        :returns: a list with the dictionaries consiting of 'filename', 'size',
-            'checksum' and the 'path', which contains the absolute path on
-            the filesystem to which the file was written. Files from SIPFiles
-            contain also 'file_uuid' key, which is the UUID (primary key) of
-            the related FileInstance object.
+        *Requires EITHER `fileinfo` or (`content` AND `filename`).*
+
+        :param fileinfo: File information on the custom file.
+        :type fileinfo: dict
+        :param content: Text content of the file
+        :type content: str
+        :param filename: Filename of the file.
+        :type filename: str
         """
-        sipfiles = sipfiles or self.sip.files
-        files_info = self._copy_files(sipfiles, filesdir, dry_run=dry_run)
-        metadata = self.get_metadata()
-        for filename, content in metadata.items():
-            files_info.append(self._save_file(
-                join(metadatadir, filename),
-                content, dry_run=dry_run))
-        return files_info
+        assert fileinfo or (content and filename)
+        if not fileinfo:
+            fileinfo = self._generate_extra_info(content, filename)
+        sf = self.storage_factory(fileurl=fileinfo['fullpath'],
+                                  size=fileinfo['size'])
+        return sf.save(BytesIO(fileinfo['content'].encode('utf-8')))
 
-    def finalize(self):
-        """Finalize the creation.
+    def _write_sipmetadata(self, fileinfo=None, sipmetadata=None):
+        """Write SIPMetadata file to disk."""
+        assert fileinfo or sipmetadata
+        if not fileinfo:
+            fileinfo = self._generate_sipmetadata_info(sipmetadata)
+        if not sipmetadata:
+            sipmetadata = SIPMetadata.query.get(
+                (self.sip.id, fileinfo['metadata_id']))
+        sf = self.storage_factory(fileurl=fileinfo['fullpath'],
+                                  size=fileinfo['size'],
+                                  modified=sipmetadata.updated)
+        return sf.save(BytesIO(sipmetadata.content.encode('utf-8')))
 
-        Among others, it deletes the directory of the archive.
+    def write_all_files(self, filesinfo=None):
+        """Write all files to the archive.
+
+        The only parameter of this method `filesinfo` is a list of dict,
+        each containing information on the files that are to be written.
+        There are three types of file-information dict that are recognizable:
+
+        * SIPFile-originated, which copy the related FileInstance bytes.
+        * SIPMetadata-originated, which write down the content of the metadata
+          to the archive.
+        * Extra files, which writes down short text files,
+          that are usually specific to the archiver format, e.g.:
+          manifest file, README, archive creation timestamp, etc.
+
+        By the default when 'filesinfo' is omitted, the base archiver
+        will generate the file info for all attached SIPFiles and SIPMetadata
+        files (but only those which SIPMetadata.type.name was specified in the
+        `SIPSTORE_ARCHIVER_METADATA_TYPES`). Specific archivers are expected
+        to overwrite the `self.get_all_files` method, or craft the
+        `filesinfo` parameter of this method externally.
+
+        For more information on the structure of the file-info dict, see
+        JSON Schema: invenio_sipstore.jsonschemas.sipstore.file-v1.0.0.json.
+
+        :param filesinfo: A list of dict, specifying the file information
+            that is to be written down to the archive. If not specified,
+            will execute the `self.get_all_files` to build the files list.
         """
-        self.fs.removedir(self.path, recursive=True, force=True)
-        self.path = ""
-
-    def _create_directories(self, dirname):
-        """Create all the intermediate directories.
-
-        :param str dirname: the name of the directory to create
-        """
-        if not self.fs.exists(dirname):
-            self.fs.makedir(dirname, recursive=True)
-
-    def _copy_files(self, files, filesdir="", dry_run=False):
-        """Copy the files inside the new storage.
-
-        Takes care of adding self.path at the beginning.
-
-        :param files: the list of files to copy
-        :type files: list(:py:class:`invenio_sipstore.models.SIPFile`)
-        :param str filesdir: the directory where to copy files
-        :param bool dry_run: When True, the files will not be copied,
-            and only the file information will be returned. No changes will be
-            made to disk or the database.
-        :returns: a list with the dictionaries consiting of 'filename', 'size',
-            'checksum' and the 'path', which contains the absolute path on
-            the filesystem to which the file was written. Files from SIPFiles
-            contain also 'file_uuid' key, which is the UUID (primary key) of
-            the related FileInstance object.
-        :rtype: list(dict)
-        """
-        result = []
-
-        total_size = sum([file.size for file in files])
+        if not filesinfo:
+            filesinfo = self.get_all_files()
+        keys = ['file_uuid', 'metadata_id', 'content']
+        if not all(any(k in fi for k in keys) for fi in filesinfo):
+            raise ValueError(
+                "Missing one of mandatory keys ({keys}) in one or more "
+                "file-information entries: {filesinfo}".format(
+                    keys=keys,
+                    filesinfo=filesinfo))
+        total_size = sum(fi['size'] for fi in filesinfo)
         copied_size = 0
+        for idx, fi in enumerate(filesinfo, 1):
+            if 'file_uuid' in fi:
+                self._write_sipfile(fileinfo=fi)
+            elif 'metadata_id' in fi:
+                self._write_sipmetadata(fileinfo=fi)
+            else:  # (if 'content' in fi)
+                self._write_extra(fileinfo=fi)
 
-        for i, file in enumerate(files):
-            src_fs, path = opener.parse(file.storage_location)
-            filename = join(filesdir, file.filepath)
-            calculated_filename = join(self.path, filename)
-            if not dry_run:
-                self._create_directories(dirname(calculated_filename))
-                copyfile(src_fs, path, self.fs, calculated_filename)
-            result.append({
-                'filename': filename,
-                'size': file.size,
-                'checksum': file.checksum,
-                'path': self.fs.getsyspath(calculated_filename),
-                'file_uuid': str(file.file.id)
-            })
-            copied_size += file.size
-
+            copied_size += fi['size']
             sipstore_archiver_status.send({
-                'total_files': len(files),
+                'total_files': len(filesinfo),
                 'total_size': total_size,
-                'copied_files': i,
+                'copied_files': idx,
                 'copied_size': copied_size,
-                'current_filename': filename,
-                'current_filesize': file.size
+                'current_filename': fi['filepath'],
+                'current_filesize': fi['size']
             })
-        return result
-
-    def _save_file(self, filename, content, dry_run=False):
-        """Save the content inside the file.
-
-        Takes care of adding self.path in the filename.
-
-        :param str filename: the name of the file
-        :param str content: the content of the file
-        :param bool dry_run: When True, the files will not be copied,
-            and only the file information will be returned. No changes will be
-            made to disk or the database.
-        :returns: a dictionary describing the saved file, containing 'filename'
-            'size', 'checksum' and 'path' which contains the absolute path on
-            the filesystem to which the file was written.
-        :rtype: dict
-
-        ..warning::
-
-           This method should be used only to write small files.
-
-        """
-        content = b(content)
-        filenamepath = join(self.path, filename)
-        if not dry_run:
-            self._create_directories(dirname(filenamepath))
-            with self.fs.open(filenamepath, 'wb') as fp:
-                fp.write(content)
-
-        return {
-            'filename': filename,
-            'size': len(content),
-            'checksum': 'md5:' + str(md5(content).hexdigest()),
-            'path': self.fs.getsyspath(filenamepath)
-        }

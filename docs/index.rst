@@ -34,6 +34,7 @@ Invenio-SIPStore.
    :maxdepth: 2
 
    installation
+   configuration
    usage
 
 

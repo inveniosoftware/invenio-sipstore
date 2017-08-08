@@ -69,22 +69,21 @@ def test_sip_model(db):
     db.session.commit()
 
 
-def test_sip_file_model(app, db, sip_with_file):
+def test_sip_file_model(app, db, sips):
     """Test the SIPFile model."""
-    assert SIP.query.count() == 1
-    assert SIPFile.query.count() == 1
+    sip = sips[0]
     app.config['SIPSTORE_FILEPATH_MAX_LEN'] = 15
     with pytest.raises(ValueError) as excinfo:
-        sipfile2 = SIPFile(sip_id=sip_with_file.id,
-                           filepath="way too long file name.zip",
-                           file_id=sip_with_file.sip_files[0].file_id)
+        SIPFile(sip_id=sip.id,
+                filepath="way too long file name.zip",
+                file_id=sip.files[0].file_id)
     assert 'Filepath too long' in str(excinfo.value)
 
 
-def test_sip_file_storage_location(db, sip_with_file):
+def test_sip_file_storage_location(db, sips):
     """Test the storage_location SIPFile member."""
-    assert sip_with_file.sip_files[0].filepath == 'foobar.txt'
-    with open(sip_with_file.sip_files[0].storage_location, "rb") as f:
+    assert sips[0].files[0].filepath == 'foobar.txt'
+    with open(sips[0].files[0].storage_location, "rb") as f:
         assert f.read() == b'test'
 
 
@@ -110,12 +109,10 @@ def test_sip_metadata_model(db):
 
 def test_sip_metadatatype_model(db):
     """Test the SIPMetadata model."""
-    sip1 = SIP.create()
     mtype = SIPMetadataType(title='JSON Test', name='json-test',
                             format='json', schema='url')
     db.session.add(mtype)
     db.session.commit()
-    assert SIP.query.count() == 1
     assert SIPMetadataType.query.count() == 1
     sipmetadatatype = SIPMetadataType.get(mtype.id)
     assert sipmetadatatype.title == 'JSON Test'
