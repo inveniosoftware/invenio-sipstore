@@ -1,8 +1,8 @@
 ===========================
- Invenio-SIPStore v1.0.0a4
+ Invenio-SIPStore v1.0.0a5
 ===========================
 
-Invenio-SIPStore v1.0.0a4 was released on July 15, 2017.
+Invenio-SIPStore v1.0.0a5 was released on August 15, 2017.
 
 About
 -----
@@ -19,7 +19,7 @@ What's new
 Installation
 ------------
 
-   $ pip install invenio-sipstore==v1.0.0a4
+   $ pip install invenio-sipstore==v1.0.0a5
 
 Documentation
 -------------
