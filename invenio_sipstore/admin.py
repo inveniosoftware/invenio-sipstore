@@ -33,17 +33,19 @@ class SIPModelView(ModelView):
     can_view_details = True
     column_display_all_relations = True
     column_list = (
-        'user_id', 'agent', 'archivable', 'archived'
+        'id', 'user_id', 'agent', 'archivable', 'archived'
     )
-    column_labels = dict(
-        user_id='User ID',
-        agent='Agent',
-        archivable='Archivable',
-        archived='Archived'
-    )
+    column_labels = {
+        'id': 'UUID',
+        'user_id': 'User ID',
+        'agent': 'Agent',
+        'archivable': 'Archivable',
+        'archived': 'Archived'
+    }
     column_filters = (
         'user_id', 'archivable', 'archived'
     )
+    column_searchable_list = ('id', 'user_id', 'agent', )
     page_size = 25
 
 
@@ -68,6 +70,7 @@ class SIPMetadataModelView(ModelView):
     column_list = (
         'type.name',
         'content',
+        'sip.id',
         'sip.agent',
         'sip.archivable',
         'sip.archived'
@@ -75,6 +78,7 @@ class SIPMetadataModelView(ModelView):
     column_labels = {
         'type.name': 'Type',
         'content': 'Content',
+        'sip.id': 'SIP',
         'sip.agent': 'Agent',
         'sip.archivable': 'Archivable',
         'sip.archived': 'Archived'
