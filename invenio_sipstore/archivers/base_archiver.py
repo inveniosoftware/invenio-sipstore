@@ -28,6 +28,8 @@ The base archiver implements a basic API that allows subclasses to not having
 to worry about e.g. files to disk.
 """
 
+from __future__ import absolute_import, print_function, unicode_literals
+
 import os
 from hashlib import md5
 
@@ -226,8 +228,9 @@ class BaseArchiver(object):
         See ``default_sipfile_name_formatter()`` and
         ``secure_sipfile_name_formatter()``.
         """
-        content = '\n'.join(('{0} {1}'.format(f['filename'], f['sipfilepath'])
-                            for f in filesinfo))
+        content = '\n'.join('{0} {1}'.format(f['filename'],
+                                             f['sipfilepath'])
+                            for f in filesinfo)
         return self._generate_extra_info(content, self.filenames_mapping_file)
 
     def _get_data_files(self):

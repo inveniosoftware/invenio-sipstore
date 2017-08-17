@@ -24,11 +24,9 @@
 
 """Module tests for the BaseArchiver class."""
 
-from __future__ import absolute_import, print_function
+from __future__ import absolute_import, print_function, unicode_literals
 
 from hashlib import md5
-
-from six import b
 
 from invenio_sipstore.archivers import BaseArchiver
 
@@ -162,19 +160,22 @@ def test_name_formatters(db, app, sips, sip_metadata_types, locations,
     assert set(fs.listdir()) == set(['metadata', 'files'])
     assert len(fs.listdir('metadata')) == 2
     # inside 'files/' there should be 'filenames.txt' file with the mappings
-    assert len(fs.listdir('files')) == 3
+    assert len(fs.listdir('files')) == 4
     uuid1 = next(f.file.id for f in sip.files if f.filepath.endswith('txt'))
     uuid2 = next(f.file.id for f in sip.files if f.filepath.endswith('js'))
+    uuid3 = next(f.file.id for f in sip.files if f.filepath.endswith('dat'))
     expected = [
-            ('metadata/marcxml-test-metadata.xml', '<p>XML 4</p>'),
-            ('metadata/json-test-metadata.json', '{"title": "JSON 4"}'),
-            ('files/{0}-foobar.txt'.format(uuid1), 'test-fourth'),
+            ('metadata/marcxml-test-metadata.xml', '<p>XML 4 żółć</p>'),
+            ('metadata/json-test-metadata.json', '{"title": "JSON 4 żółć"}'),
+            ('files/{0}-foobar.txt'.format(uuid1), 'test-fourth żółć'),
             ('files/{0}-http_maliciouswebsite.com_hack.js'.format(uuid2),
-             'test-fifth'),
-            ('files/filenames.txt', set(
-                ['{0}-foobar.txt ../../foobar.txt'.format(uuid1),
-                 '{0}-http_maliciouswebsite.com_hack.js '
-                 'http://maliciouswebsite.com/hack.js'.format(uuid2)]))
+             'test-fifth ąęćźə'),
+            ('files/{0}-ozzcae.dat'.format(uuid3), 'test-sixth π'),
+            ('files/filenames.txt',
+             set(['{0}-foobar.txt ../../foobar.txt'.format(uuid1),
+                  '{0}-http_maliciouswebsite.com_hack.js '
+                  'http://maliciouswebsite.com/hack.js'.format(uuid2),
+                  '{0}-ozzcae.dat łóżźćąę.dat'.format(uuid3), ]))
 
     ]
     for fn, content in expected:

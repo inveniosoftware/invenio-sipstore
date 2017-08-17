@@ -25,7 +25,7 @@
 
 """Pytest configuration."""
 
-from __future__ import absolute_import, print_function
+from __future__ import absolute_import, print_function, unicode_literals
 
 import os
 import shutil
@@ -209,13 +209,17 @@ def sips(db, locations, sip_metadata_types):
     # A SIP with naughty filenames
     sip4 = SIP.create()
     sip4api = SIPApi(sip4)
-    sip4api.attach_metadata('marcxml-test', '<p>XML 4</p>')
-    sip4api.attach_metadata('json-test', '{"title": "JSON 4"}')
+    sip4api.attach_metadata('marcxml-test', '<p>XML 4 żółć</p>')
+    sip4api.attach_metadata('json-test', '{"title": "JSON 4 żółć"}')
     file4 = FileInstance.create()
-    file4.set_contents(BytesIO(b'test-fourth'),
+    file4.set_contents(BytesIO('test-fourth żółć'.encode('utf-8')),
                        default_location=locations['default'].uri)
     file5 = FileInstance.create()
-    file5.set_contents(BytesIO(b'test-fifth'),
+    file5.set_contents(BytesIO('test-fifth ąęćźə'.encode('utf-8')),
+                       default_location=locations['default'].uri)
+
+    file6 = FileInstance.create()
+    file6.set_contents(BytesIO('test-sixth π'.encode('utf-8')),
                        default_location=locations['default'].uri)
     sip5file4 = SIPFile(sip_id=sip4.id, filepath="../../foobar.txt",
                         file_id=file4.id)
@@ -224,8 +228,13 @@ def sips(db, locations, sip_metadata_types):
                         filepath="http://maliciouswebsite.com/hack.js",
                         file_id=file5.id)
 
+    sip5file6 = SIPFile(sip_id=sip4.id,
+                        filepath="łóżźćąę.dat",
+                        file_id=file6.id)
+
     db_.session.add(sip5file4)
     db_.session.add(sip5file5)
+    db_.session.add(sip5file6)
 
     db_.session.commit()
     return [sip1api, sip2api, sip3api, sip4api]
