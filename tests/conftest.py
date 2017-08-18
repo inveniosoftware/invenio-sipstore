@@ -156,10 +156,11 @@ def sip_metadata_types(db):
 def sips(db, locations, sip_metadata_types):
     """Fixture for the SIP objects sharing multiple files.
 
-    Three SIPs are sharing three files in the following way:
+    Four SIPs are sharing three files in the following way:
     SIP-1: File1
     SIP-2: File1, File2
     SIP-3: File2(renamed on SIPFile, but same FileInstance), File3
+    SIP-4: File4, File5, File6
     """
     sip1 = SIP.create()
     sip1api = SIPApi(sip1)
@@ -236,8 +237,13 @@ def sips(db, locations, sip_metadata_types):
     db_.session.add(sip5file5)
     db_.session.add(sip5file6)
 
+    # A SIP with metadata-only changes
+    sip5 = SIP.create()
+    sip5api = SIPApi(sip5)
+    sip5api.attach_metadata('marcxml-test', '<p>XML 5 Meta Only</p>')
+
     db_.session.commit()
-    return [sip1api, sip2api, sip3api, sip4api]
+    return [sip1api, sip2api, sip3api, sip4api, sip5api]
 
 
 @pytest.yield_fixture()

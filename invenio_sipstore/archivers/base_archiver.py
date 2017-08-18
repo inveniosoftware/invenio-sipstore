@@ -38,6 +38,7 @@ from invenio_files_rest.models import FileInstance
 from six import BytesIO
 
 from .. import current_sipstore
+from ..api import SIP
 from ..models import SIPMetadata
 from ..signals import sipstore_archiver_status
 
@@ -109,7 +110,7 @@ class BaseArchiver(object):
             class instance.
         :param filenames_mapping_file: Mapping of file names.
         """
-        self.sip = sip
+        self.sip = sip if isinstance(sip, SIP) else SIP(sip)
         self.data_dir = data_dir
         self.metadata_dir = metadata_dir
         self.extra_dir = extra_dir
@@ -117,7 +118,7 @@ class BaseArchiver(object):
             current_sipstore.storage_factory
         self.filenames_mapping_file = filenames_mapping_file
 
-    def _get_archive_base_uri(self):
+    def get_archive_base_uri(self):
         """Get the base URI (absolute path) for the archive location.
 
         To configure the URI, specify the relevant configuration variable
@@ -132,7 +133,7 @@ class BaseArchiver(object):
         """
         return current_sipstore.archive_location
 
-    def _get_archive_subpath(self):
+    def get_archive_subpath(self):
         """Generate the relative directory path of the archived SIP.
 
         The behaviour of this method can be changed by changing the
@@ -149,15 +150,15 @@ class BaseArchiver(object):
 
         The return value of this method is a location that is *relative*
         to the base archive URI, the full path that is constructed later
-        can be (based on examples from
-        :py:data:`BaseArchiver._get_archive_base_uri()`):
+        can look as follows: (based on examples from
+        :py:data:`BaseArchiver.get_archive_base_uri()`):
 
         * ``/data/archive/ab/cd/ab12-abcd-1234-dcba-123412341234``
         * ``root://eospublic.cern.ch//eos/archive/12345/r/5``
         """
         return os.path.join(*current_sipstore.archive_path_builder(self.sip))
 
-    def _get_fullpath(self, filepath):
+    def get_fullpath(self, filepath):
         """Generate the absolute (full path) to the file in the archive system.
 
         :param filepath: path to the file, relative to archive subdirectory
@@ -168,8 +169,8 @@ class BaseArchiver(object):
         :rtype: str
         """
         return os.path.join(
-            self._get_archive_base_uri(),
-            self._get_archive_subpath(),
+            self.get_archive_base_uri(),
+            self.get_archive_subpath(),
             filepath
         )
 
@@ -181,7 +182,7 @@ class BaseArchiver(object):
             checksum=sipfile.checksum,
             size=sipfile.size,
             filepath=filepath,
-            fullpath=self._get_fullpath(filepath),
+            fullpath=self.get_fullpath(filepath),
             file_uuid=str(sipfile.file_id),
             filename=filename,
             sipfilepath=sipfile.filepath,
@@ -196,7 +197,7 @@ class BaseArchiver(object):
                 md5(sipmetadata.content.encode('utf-8')).hexdigest())),
             size=len(sipmetadata.content),
             filepath=filepath,
-            fullpath=self._get_fullpath(filepath),
+            fullpath=self.get_fullpath(filepath),
             metadata_id=sipmetadata.type_id,
         )
 
@@ -208,7 +209,7 @@ class BaseArchiver(object):
                     str(md5(content.encode('utf-8')).hexdigest())),
             size=len(content),
             filepath=filepath,
-            fullpath=self._get_fullpath(filepath),
+            fullpath=self.get_fullpath(filepath),
             content=content
         )
 

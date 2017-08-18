@@ -33,6 +33,7 @@ from flask import current_app
 from invenio_db import db
 from jsonschema import validate
 
+from invenio_sipstore.api import SIP
 from invenio_sipstore.archivers import BaseArchiver
 from invenio_sipstore.models import SIPMetadata, SIPMetadataType, \
     current_jsonschemas
@@ -88,7 +89,8 @@ class BagItArchiver(BaseArchiver):
                 fetch.txt: b.txt
 
         :param sip: API instance of the SIP that is to be archived.
-        :type sip: invenio_sipstore.api.SIP
+        :type sip: :py:class:`invenio_sipstore.api.SIP`
+            or :py:class:`invenio_sipstore.models.SIP`
         :param data_dir: directory where the SIPFiles will be written.
         :param metadata_dir: directory where the SIPMetadata will be written.
         :param extra_dir: directory where all extra files will be written,
@@ -97,7 +99,8 @@ class BagItArchiver(BaseArchiver):
             the new SIPFiles, and refer to the repeated ones in "fetch.txt"
             file. The provided argument is a SIP API, which will be taken as a
             base for determining the "diff" between two bags.
-        :type patch_of: invenio_sipstore.models.SIP or None
+        :type patch_of: :py:class:`invenio_sipstore.api.SIP`
+            or :py:class:`invenio_sipstore.models.SIP`
         :type bool include_missing_files: If set to True and if 'patch_of' is
             used, include the files that are missing in the SIP w.r.t. to
             the 'patch_of' SIP in the manifest.
@@ -114,7 +117,8 @@ class BagItArchiver(BaseArchiver):
             sip, data_dir=data_dir, metadata_dir=metadata_dir,
             extra_dir=extra_dir, filenames_mapping_file=filenames_mapping_file)
         self.tags = tags or current_app.config['SIPSTORE_BAGIT_TAGS']
-        self.patch_of = patch_of
+        self.patch_of = (patch_of if isinstance(patch_of, SIP)
+                         else SIP(patch_of)) if patch_of else None
         self.include_all_previous = include_all_previous
 
     @staticmethod
@@ -267,7 +271,7 @@ class BagItArchiver(BaseArchiver):
 
         return data_files + metadata_files + extra_files + bagit_files
 
-    def save_bagit_metadata(self, filesinfo=None):
+    def save_bagit_metadata(self, filesinfo=None, overwrite=False):
         """Generate and save the BagIt metadata information as SIPMetadata."""
         if not filesinfo:
             filesinfo = self.get_all_files()
@@ -283,12 +287,22 @@ class BagItArchiver(BaseArchiver):
         validate(bagit_metadata, schema)
 
         # Create the BagIt schema object
+        bagit_type = self._get_bagit_metadata_type()
+        content = json.dumps(bagit_metadata)
         with db.session.begin_nested():
-            obj = SIPMetadata(
-                sip_id=self.sip.id,
-                type_id=BagItArchiver._get_bagit_metadata_type().id,
-                content=json.dumps(bagit_metadata))
-            db.session.add(obj)
+            obj = SIPMetadata.query.get((self.sip.id, bagit_type.id))
+            if obj:
+                if overwrite:
+                    obj.content = content
+                else:
+                    raise Exception(
+                        'Attempting to save BagIt metadata on top of existing'
+                        ' one. Use the "overwrite" flag to force.')
+            else:
+                obj = SIPMetadata(sip_id=self.sip.id,
+                                  type_id=bagit_type.id,
+                                  content=content)
+                db.session.add(obj)
 
     def write_all_files(self):
         """Write all of the archived files to the archive file system."""

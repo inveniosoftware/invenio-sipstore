@@ -35,7 +35,7 @@ def test_getters(db, sips, sip_metadata_types, locations):
     """Test the constructor and the getters."""
     sip = sips[0]
     archiver = BaseArchiver(sip)
-    assert archiver._get_archive_base_uri() == locations['archive'].uri
+    assert archiver.get_archive_base_uri() == locations['archive'].uri
     assert archiver.sip is sip
     # get data files
     data_files_info = archiver._get_data_files()
@@ -92,7 +92,7 @@ def test_write(db, sips, sip_metadata_types, locations, archive_fs):
     assert not archive_fs.listdir()  # Empty archive
     archiver._write_sipfile(data_files_info[0])
     assert len(archive_fs.listdir()) == 1
-    fs = archive_fs.opendir(archiver._get_archive_subpath())
+    fs = archive_fs.opendir(archiver.get_archive_subpath())
     assert fs.isfile('files/foobar.txt')
 
     assert not fs.isfile('metadata/json-test.json')
@@ -132,7 +132,7 @@ def test_write_all(db, sips, sip_metadata_types, locations, archive_fs):
     assert not archive_fs.listdir()
     archiver.write_all_files()
     assert len(archive_fs.listdir()) == 1
-    fs = archive_fs.opendir(archiver._get_archive_subpath())
+    fs = archive_fs.opendir(archiver.get_archive_subpath())
     assert len(fs.listdir()) == 2
     assert len(fs.listdir('metadata')) == 2
     assert len(fs.listdir('files')) == 1
@@ -156,7 +156,7 @@ def test_name_formatters(db, app, sips, sip_metadata_types, locations,
     assert not archive_fs.listdir()
     archiver.write_all_files()
     assert len(archive_fs.listdir()) == 1
-    fs = archive_fs.opendir(archiver._get_archive_subpath())
+    fs = archive_fs.opendir(archiver.get_archive_subpath())
     assert set(fs.listdir()) == set(['metadata', 'files'])
     assert len(fs.listdir('metadata')) == 2
     # inside 'files/' there should be 'filenames.txt' file with the mappings
