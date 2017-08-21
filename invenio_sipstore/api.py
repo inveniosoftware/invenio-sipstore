@@ -244,7 +244,9 @@ class RecordSIP(object):
         """
         files = record.files if create_sip_files else None
         mtype = SIPMetadataType.get_from_schema(record['$schema'])
-        metadata = {mtype.name: json.dumps(record.dumps())}
+        metadata = {mtype.name: json.dumps(record.dumps(),
+                                           indent=4,
+                                           sort_keys=True)}
         with db.session.begin_nested():
             sip = SIP.create(archivable, files=files, metadata=metadata,
                              user_id=user_id, agent=agent)
