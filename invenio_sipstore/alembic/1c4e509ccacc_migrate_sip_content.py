@@ -80,50 +80,61 @@ def upgrade():
     # Only this kind of connection can return results
     conn = op.get_bind()
 
-    sip_metadata_types_defined = \
-        sa.select([sa.func.count()]).select_from(SIPMetadataType)
-    if conn.execute(sip_metadata_types_defined).scalar() == 0:
-        # Autogenerate SIP metadata types from the available "SIP.sip_format"
-        # NOTE: This is a slow operation because of the distinct query. If it's
-        # possible beforehand to properly create your SIP metadata type entries
-        # it would save some time. Keep in mind that types will have to be
-        # created for ALL the values that `sipstore_sip.sip_format` has.
-        for (sip_format,) in conn.execute(
-                sa.select([OldSIP.c.sip_format]).distinct()):
-            op.execute(SIPMetadataType.insert().values(
-                title=sip_format, name=sip_format, format=sip_format))
-        print('Check your SIPMetadataType entries, to possibly update '
-              '"title", "name", "format" and "schema" to appropriate values.')
+    # Check if there actually are any rows to migrate...
+    old_sip_metadata_count = sa.select([sa.func.count()]).select_from(OldSIP)
+    if conn.execute(old_sip_metadata_count).scalar() > 0:
+        sip_metadata_types_defined = \
+            sa.select([sa.func.count()]).select_from(SIPMetadataType)
+        if conn.execute(sip_metadata_types_defined).scalar() == 0:
+            # Autogenerate SIP metadata types from the available SIP.sip_format
+            # NOTE: This is a slow operation because of the distinct query. If
+            # it's possible beforehand to properly create your SIP metadata
+            # type entries it would save some time. Keep in mind that types
+            # will have to be created for ALL the values that
+            # `sipstore_sip.sip_format` has.
+            for (sip_format,) in conn.execute(
+                    sa.select([OldSIP.c.sip_format]).distinct()):
+                op.execute(SIPMetadataType.insert().values(
+                    title=sip_format, name=sip_format, format=sip_format))
+            print('Check your SIPMetadataType entries, to possibly update or '
+                  'insert "title", "name", "format" and "schema" to '
+                  'appropriate values.')
 
-    # Build SIP metatada type name-to-id mapping
-    sip_mtypes = dict(iter(conn.execute(
-        sa.select([SIPMetadataType.c.name, SIPMetadataType.c.id]))))
-    # NOTE: SWITCH/CASE is more efficient than a JOIN on the types table
-    sip_metadata_type_mapping = sa.case(sip_mtypes, value=OldSIP.c.sip_format)
+        # Build SIP metatada type name-to-id mapping
+        sip_mtypes = dict(iter(conn.execute(
+            sa.select([SIPMetadataType.c.name, SIPMetadataType.c.id]))))
+        if not sip_mtypes:
+            raise Exception('There are no SIP Metadata Types defined. Cannot'
+                            'perform the content migration.')
+        # NOTE: SWITCH/CASE is more efficient than a JOIN on the types table
+        sip_metadata_type_mapping = (
+            sa.case(sip_mtypes, value=OldSIP.c.sip_format).label('type_id')
+        )
 
-    # Migrate old `content` field as separate entry to new SIPMetadata table
-    old_sip_metadata = (
-        sa.select(
-            [OldSIP.c.id, OldSIP.c.created, OldSIP.c.updated,
-             sip_metadata_type_mapping, OldSIP.c.content],
-            from_obj=OldSIP.outerjoin(SIPMetadata,
-                                      OldSIP.c.id == SIPMetadata.c.sip_id))
-        .where(sa.and_(OldSIP.c.sip_format.isnot(None),
-                       SIPMetadata.c.sip_id.is_(None))))
+        # Migrate old `content` field as separate entry to SIPMetadata table
+        old_sip_metadata = (
+            sa.select(
+                [OldSIP.c.id, OldSIP.c.created, OldSIP.c.updated,
+                 sip_metadata_type_mapping, OldSIP.c.content],
+                from_obj=OldSIP.outerjoin(
+                    SIPMetadata, OldSIP.c.id == SIPMetadata.c.sip_id))
+            .where(sa.and_(OldSIP.c.sip_format.isnot(None),
+                           SIPMetadata.c.sip_id.is_(None)))
+        )
 
-    # If there is a chunk size defined, move the data in chunks
-    chunk_size = int(os.environ.get('SIPSTORE_MIGRATION_CHUNK_SIZE', 0))
-    if chunk_size:
-        old_sip_metadata = old_sip_metadata.limit(chunk_size)
+        # If there is a chunk size defined, move the data in chunks
+        chunk_size = int(os.environ.get('SIPSTORE_MIGRATION_CHUNK_SIZE', 0))
+        if chunk_size:
+            old_sip_metadata = old_sip_metadata.limit(chunk_size)
 
-    insert_to_sip_metadata = SIPMetadata.insert().from_select(
-        ['sip_id', 'created', 'updated', 'type_id', 'content'],
-        old_sip_metadata)
+        insert_to_sip_metadata = SIPMetadata.insert().from_select(
+            ['sip_id', 'created', 'updated', 'type_id', 'content'],
+            old_sip_metadata)
 
-    total_rows_migrated = 0
-    while conn.execute(insert_to_sip_metadata).rowcount and chunk_size:
-        total_rows_migrated += chunk_size
-        print('{} rows migrated'.format(total_rows_migrated))
+        total_rows_migrated = 0
+        while conn.execute(insert_to_sip_metadata).rowcount and chunk_size:
+            total_rows_migrated += chunk_size
+            print('{} rows migrated'.format(total_rows_migrated))
 
     # Add the NOT NULL constraint
     op.alter_column('sipstore_sip', 'archivable', nullable=False)
