@@ -28,10 +28,10 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from uuid import UUID
 
-from invenio_sipstore.archivers.utils import \
-    secure_sipfile_name_formatter as fmt
 from invenio_sipstore.archivers.utils import chunks, \
     default_archive_directory_builder
+from invenio_sipstore.archivers.utils import \
+    secure_sipfile_name_formatter as fmt
 from invenio_sipstore.models import SIP
 
 

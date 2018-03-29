@@ -35,8 +35,8 @@ import pytest
 from flask import Flask
 from fs.opener import opener
 from invenio_accounts import InvenioAccounts
-from invenio_db import db as db_
 from invenio_db import InvenioDB
+from invenio_db import db as db_
 from invenio_files_rest import InvenioFilesREST
 from invenio_files_rest.models import FileInstance, Location
 from invenio_jsonschemas import InvenioJSONSchemas
