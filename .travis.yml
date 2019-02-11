@@ -1,26 +1,10 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016 CERN.
+# Copyright (C) 2016-2019 CERN.
 #
-# Invenio is free software; you can redistribute it
-# and/or modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
-#
-# Invenio is distributed in the hope that it will be
-# useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Invenio; if not, write to the
-# Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307, USA.
-#
-# In applying this license, CERN does not
-# waive the privileges and immunities granted to it by virtue of its status
-# as an Intergovernmental Organization or submit itself to any jurisdiction.
+# Invenio is free software; you can redistribute it and/or modify it
+# under the terms of the MIT License; see LICENSE file for more details.
 
 
 notifications:
@@ -32,6 +16,8 @@ language: python
 
 matrix:
   fast_finish: true
+  allow_failures:
+    - env: REQUIREMENTS=devel
 
 cache:
   - pip
@@ -64,9 +50,9 @@ after_success:
 
 deploy:
   provider: pypi
-  user: lnielsen
+  user: inveniosoftware
   password:
-    secure: QxwAaTVisg9G5A2c2JGSDLhw5SBW+8VmJ7Tqdk+K+9mnqAVP7wFo6s6CvSkn6cKIaUjS+Zr688jRsSbrNqw2MimfKE2L7hnUuSM8WdoHhrnoYemIu4zJ7j2wnkz0Mvkkp8fyFuMkgpNu6prARrmBTBA+4FUuybY7XZTcyXUTdCpkbbwtdGbpYRnviLLvKG4tqxVXIcB93FltMmWPuKc37IHk+HMdr7+U0LwWyLjNc0ifB9kEq2dltjpldfNu5ZbRPv5LOkU49c7KZyNok16i4wIYweaOWOGhSE/vKVt4+oiCwHfZyvIYEs/t+RVaUlixRFwvVjkkkPhzlOuy0Vr9Z9z88vbvShgm0z5uMAaWEvarx3tWpMy2hLV7NZakyLSOoxIipHZr0sJDP08nURPaWJwHbxxKx5Qb3xr6F4rF0u85KvvWXLzWC0zS6wTNi+WIu2HqDGHko28cZwUO2I5ImERpHp8Gntpiw/C2aJvuiZ8ohyh6gqixEA7PSwwIzH8kdXyoZocJ48JnZtl8VLA3QkKv0jTPkargOgZ86ZlzsXJY2GFhYccupVaU+uNFuDFMWxDhhwyac3GAVtnzLdAKGTLHzqwfkDyaJDb2O0N8jd4LA+KCvSGs2z1DgMTXlwI40xrbYmuKnLkLSFdmWslIMJ2tfurxQBmka9sdF3cmAZE=
+    secure: "Hdp77M2UIrJfqXjkdqVNjgsEAgN2SyycyczG59tD/LQ+TxTIgqHRiJbyQlgWQ9rty/Txk/rai3C7TjrVu9YX8dtVmbfG7NYs0A5KvTa6o94N+NAxCqpIHms8GUOcXGwJ2R45iBEhOtqvX7R3kKhLziUGq9uRQO9Wv65yAsDlncC6+Zpx102o2YbTmiMTBtHTD38ufpSW3J7kn1YOo2LbUp7h/1wQ1vXO0Mtr3uUwJvTt5GCUn1kg+ncgAF5qgtlihrEQwXd4KJPJpxhWOt+mtXsa/ttAdUmWfsONDKe/1cxWIOT2nZRADL3Mlsns9xlYCthoFt1BjUsFz4R8nVQtcZVlnjjFUNJ+LEPPibcrnXgullDHzI0j6U73QB5K25Mfnb9uci6tBOKq+WeIxAYS+h/nwdIQJ0EvRpZe8qf1lO0gpmGd5PnYlkbCHGwFEInkv9miYwGw66jyDwpn769xRAmnd4fHQVVUqv4ejdlqHyd8N+FyKFwVsg3LJzV3fu7cXyIaFQ568p2yPOCTu7zTP7SJgnw0+HnvPeuRD/cHM1CWdO6Rj121MpDaKBDPhQX0RN5rk15DW3Uihvq2yf5e7URwNKTURGp0gBGyAzRsPQq82VaHJnzPrvIU6r0NZM49G341zwefUmwK9VMidG0SD5NvL2UlURzE/TQUXTcaQGo="
   distributions: "sdist bdist_wheel"
   on:
     tags: true
