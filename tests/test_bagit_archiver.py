@@ -193,7 +193,10 @@ def test_write_patched(mocker, sips, archive_fs,
             "Bagging-Date: {0}\n".format(dt) +
             "Payload-Oxum: 93.4\n"
             "External-Identifier: {0}/SIPBagIt-v1.0.0\n".format(sips[0].id) +
-            "External-Description: BagIt archive of SIP."
+            "External-Description: BagIt archive of SIP.\n"
+            "X-Agent-Email: spiderpig@invenio.org\n"
+            "X-Agent-Ip-Address: 1.1.1.1\n"
+            "X-Agent-Orcid: 1111-1111-1111-1111"
         )),
     ]
     expected_sip2 = [

@@ -25,6 +25,7 @@ tests_require = [
     'pytest-mock>=1.6.0',
     'pytest-pep8>=1.0.6',
     'pytest>=2.8.0',
+    'more-itertools<=5.0.0'  # dropped python 2.7 support in 6.x
 ]
 
 extras_require = {
