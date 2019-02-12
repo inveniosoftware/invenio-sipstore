@@ -16,6 +16,8 @@ from datetime import datetime
 from flask import current_app
 from invenio_db import db
 from jsonschema import validate
+from six import string_types
+from werkzeug.utils import import_string
 
 from invenio_sipstore.api import SIP
 from invenio_sipstore.archivers import BaseArchiver
@@ -172,6 +174,26 @@ class BagItArchiver(BaseArchiver):
         """Generate the bagging date timestamp."""
         return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
 
+    @staticmethod
+    def _generate_agent_tags(agent):
+        """Generate the agent info tags.
+
+        This method can be changed in the config to suit your needs, see
+        :py:data:`invenio_sipstore.config.SIPSTORE_AGENT_TAGS_FACTORY`
+
+        :return: agent information tags.
+        :rtype: list[(str, str)]
+        """
+        def _convert_key(key):
+            """Convert from snake_case."""
+            return ('-').join([x.capitalize() for x in key.split('_')])
+
+        exclude = ['$schema']
+
+        return [('X-Agent-{0}'.format(_convert_key(k)), v)
+                for k, v in sorted(agent.items())
+                if isinstance(v, string_types) and k not in exclude]
+
     def get_baginfo_file(self, filesinfo):
         """Create the bag-info.txt file from the tags."""
         # Include some auto-generated tags
@@ -184,6 +206,15 @@ class BagItArchiver(BaseArchiver):
             elif t_name == 'External-Identifier' and t_value is None:
                 t_value = '{0}/{1}'.format(self.sip.id, self.archiver_version)
             content.append("{0}: {1}".format(t_name, t_value))
+
+        # Include agent tags
+        if self.sip.agent:
+            agent_tags_factory = import_string(
+                    current_app.config['SIPSTORE_AGENT_TAGS_FACTORY'])
+            agent_tags = agent_tags_factory(self.sip.agent)
+
+            for k, v in agent_tags:
+                content.append("{0}: {1}".format(k, v))
 
         content = "\n".join(content)
         return self._generate_extra_info(content, 'bag-info.txt')
@@ -243,7 +274,7 @@ class BagItArchiver(BaseArchiver):
         extra_files = self._get_extra_files(data_files, metadata_files)
 
         bagit_files = []
-        fetched_fi = [fi for fi in data_files if self._is_fetched(fi)]
+        fetched_fi = [f for f in data_files if self._is_fetched(f)]
         if fetched_fi:
             bagit_files.append(self.get_fetch_file(fetched_fi))
         bagit_files.append(self.get_baginfo_file(data_files + metadata_files +

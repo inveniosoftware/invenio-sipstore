@@ -146,7 +146,12 @@ def sips(db, locations, sip_metadata_types):
     SIP-3: File2(renamed on SIPFile, but same FileInstance), File3
     SIP-4: File4, File5, File6
     """
-    sip1 = SIP.create()
+    # A SIP with agent info
+    sip1 = SIP.create(agent={
+        'email': 'spiderpig@invenio.org',
+        'orcid': '1111-1111-1111-1111',
+        'ip_address': '1.1.1.1'
+    })
     sip1api = SIPApi(sip1)
     sip1api.attach_metadata('marcxml-test', '<p>XML 1</p>')
     sip1api.attach_metadata('json-test', '{"title": "JSON 1"}')
