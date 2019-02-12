@@ -24,6 +24,10 @@ SIPSTORE_AGENT_JSONSCHEMA_ENABLED = True
 SIPSTORE_AGENT_FACTORY = 'invenio_sipstore.api.SIP._build_agent_info'
 """Factory to build the agent, stored for the information about the SIP."""
 
+SIPSTORE_AGENT_TAGS_FACTORY = \
+    'invenio_sipstore.archivers.BagItArchiver._generate_agent_tags'
+"""Factory to build agent information tags."""
+
 SIPSTORE_FILEPATH_MAX_LEN = 1024
 """Max filepath length."""
 
