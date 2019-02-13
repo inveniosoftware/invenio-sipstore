@@ -250,5 +250,19 @@ def test_RecordSIP_create(db, mocker):
     assert SIPMetadata.query.count() == 2
     assert len(rsip.sip.files) == 0
     assert len(rsip.sip.metadata) == 1
+
+    # try with specific SIP metadata type
+    mtype = SIPMetadataType(title='JSON Test 2', name='json-test-2',
+                            format='json', schema=None)  # no schema
+    db.session.add(mtype)
+    db.session.commit()
+
+    rsip = RecordSIP.create(pid, record, True, create_sip_files=False,
+                            user_id=user.id, agent=agent,
+                            sip_metadata_type='json-test-2')
+    assert SIPMetadata.query.count() == 3
+    assert len(rsip.sip.metadata) == 1
+    assert rsip.sip.metadata[0].type.id == mtype.id
+
     # finalization
     rmtree(tmppath)
