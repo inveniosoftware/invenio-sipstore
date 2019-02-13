@@ -54,7 +54,6 @@ def base_app(instance_path):
         SECURITY_PASSWORD_SALT='CHANGE_ME',
         SQLALCHEMY_DATABASE_URI=os.environ.get(
             'SQLALCHEMY_DATABASE_URI', 'sqlite:///test.db'),
-        SIPSTORE_ARCHIVER_METADATA_TYPES=['json-test', 'marcxml-test']
     )
     InvenioSIPStore(app)
     return app
@@ -118,9 +117,6 @@ def sip_metadata_types(db):
         title='Record MARCXML Metadata',
         name='marcxml-test',
         format='xml')
-    # The type 'txt-test' is intentionally ommited from the configuration
-    # (SIPSTORE_ARCHIVER_METADATA_TYPES). It should not be archived in any of
-    # the tests.
     txt_type = SIPMetadataType(
         title='Raw Text Metadata',
         name='txt-test',
@@ -131,7 +127,7 @@ def sip_metadata_types(db):
     db.session.add(xml_type)
     db.session.add(txt_type)
     db.session.commit()
-    types = dict((t.name, t) for t in [bagit_type, json_type, xml_type])
+    types = {t.name: t for t in [bagit_type, json_type, xml_type, txt_type]}
 
     return types
 

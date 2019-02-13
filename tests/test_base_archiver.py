@@ -40,10 +40,10 @@ def test_getters(db, sips, sip_metadata_types, locations):
     assert data_files_info == [fi, ]
 
     metafiles_info = archiver._get_metadata_files()
-    assert len(metafiles_info) == 2
+    assert len(metafiles_info) == 3
     m1_abs_path = abs_path_fmt.format(filepath="metadata/json-test.json")
-    m2_abs_path = abs_path_fmt.format(
-        filepath="metadata/marcxml-test.xml")
+    m2_abs_path = abs_path_fmt.format(filepath="metadata/marcxml-test.xml")
+    m3_abs_path = abs_path_fmt.format(filepath="metadata/txt-test.txt")
     m1 = {
         'checksum': 'md5:da4ab7e4c4b762d8e2f3ec3b9f801b1f',
         'fullpath': m1_abs_path,
@@ -58,14 +58,23 @@ def test_getters(db, sips, sip_metadata_types, locations):
         'filepath': 'metadata/marcxml-test.xml',
         'size': 12
     }
+    m3 = {
+        'checksum': 'md5:d7aad7ac23351f42ecbf62cd637ea398',
+        'fullpath': m3_abs_path,
+        'metadata_id': sip_metadata_types['txt-test'].id,
+        'filepath': 'metadata/txt-test.txt',
+        'size': 12
+    }
     assert m1 in metafiles_info
     assert m2 in metafiles_info
+    assert m3 in metafiles_info
 
     all_files_info = archiver.get_all_files()
-    assert len(all_files_info) == 3
+    assert len(all_files_info) == 4
     assert fi in all_files_info
     assert m1 in all_files_info
     assert m2 in all_files_info
+    assert m3 in all_files_info
 
 
 def test_write(db, sips, sip_metadata_types, locations, archive_fs):
@@ -118,11 +127,12 @@ def test_write_all(db, sips, sip_metadata_types, locations, archive_fs):
     assert len(archive_fs.listdir()) == 1
     fs = archive_fs.opendir(archiver.get_archive_subpath())
     assert len(fs.listdir()) == 2
-    assert len(fs.listdir('metadata')) == 2
+    assert len(fs.listdir('metadata')) == 3
     assert len(fs.listdir('files')) == 1
     expected = {
             ('metadata/marcxml-test.xml', '<p>XML 1</p>'),
             ('metadata/json-test.json', '{"title": "JSON 1"}'),
+            ('metadata/txt-test.txt', 'Title: TXT 1'),
             ('files/foobar.txt', 'test'),
     }
     for fn, content in expected:

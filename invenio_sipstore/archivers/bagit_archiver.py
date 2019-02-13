@@ -270,7 +270,9 @@ class BagItArchiver(BaseArchiver):
             for uuid in archived_uuids:
                 data_files.append(id2df[uuid])
 
-        metadata_files = self._get_metadata_files()
+        bagit_metadata_type = self._get_bagit_metadata_type()
+        metadata_files = [f for f in self._get_metadata_files()
+                          if f['metadata_id'] != bagit_metadata_type.id]
         extra_files = self._get_extra_files(data_files, metadata_files)
 
         bagit_files = []

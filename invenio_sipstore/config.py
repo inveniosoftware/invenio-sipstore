@@ -51,9 +51,6 @@ SIPSTORE_ARCHIVER_LOCATION_NAME = 'archive'
 """Name of the invenio_files_rest.models.Location object, which will specify
 to the archive location in its URI."""
 
-SIPSTORE_ARCHIVER_METADATA_TYPES = ['json', ]
-"""List of metadata types (SIPMetadataType.name) to include in archiving."""
-
 SIPSTORE_BAGIT_TAGS = [
     ('Source-Organization', 'European Organization for Nuclear Research'),
     ('Organization-Address', 'CERN, CH-1211 Geneva 23, Switzerland'),

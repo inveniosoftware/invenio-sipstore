@@ -52,7 +52,7 @@ def test_get_all_files(sips):
     """Test the function get_all_files."""
     archiver = BagItArchiver(sips[0])
     files = archiver.get_all_files()
-    assert len(files) == 8
+    assert len(files) == 9
 
 
 def test_write_all_files(sips, archive_fs):
@@ -69,7 +69,7 @@ def test_write_all_files(sips, archive_fs):
     assert set(fs.listdir('data')) == \
         set(['metadata', 'files', 'filenames.txt'])
     assert set(fs.listdir('data/metadata')) == \
-        set(['marcxml-test.xml', 'json-test.json', ])
+        set(['marcxml-test.xml', 'json-test.json', 'txt-test.txt'])
     assert set(fs.listdir('data/files')) == set(['foobar.txt', ])
 
 
@@ -139,7 +139,7 @@ def test_write_patched(mocker, sips, archive_fs,
     assert set(fs1.listdir('data')) == \
         set(['files', 'metadata', 'filenames.txt'])
     assert len(fs1.listdir('data/files')) == 1
-    assert len(fs1.listdir('data/metadata')) == 2
+    assert len(fs1.listdir('data/metadata')) == 3
 
     assert set(fs2.listdir('data')) == \
         set(['files', 'metadata', 'filenames.txt'])
@@ -182,6 +182,8 @@ def test_write_patched(mocker, sips, archive_fs,
             "{checksum} {filepath}".format(
                 **_read_file(fs1, 'data/metadata/json-test.json')),
             "{checksum} {filepath}".format(
+                **_read_file(fs1, 'data/metadata/txt-test.txt')),
+            "{checksum} {filepath}".format(
                 **_read_file(fs1, 'data/filenames.txt')),
         ])),
         ('data/filenames.txt', set([
@@ -191,7 +193,7 @@ def test_write_patched(mocker, sips, archive_fs,
             "Source-Organization: European Organization for Nuclear Research\n"
             "Organization-Address: CERN, CH-1211 Geneva 23, Switzerland\n"
             "Bagging-Date: {0}\n".format(dt) +
-            "Payload-Oxum: 93.4\n"
+            "Payload-Oxum: 105.5\n"
             "External-Identifier: {0}/SIPBagIt-v1.0.0\n".format(sips[0].id) +
             "External-Description: BagIt archive of SIP.\n"
             "X-Agent-Email: spiderpig@invenio.org\n"

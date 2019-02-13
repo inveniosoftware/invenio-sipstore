@@ -239,12 +239,9 @@ class BaseArchiver(object):
 
         :return: list of dict containing file information.
         """
-        # Consider only the explicitly-configured metadata types
-        m_names = current_app.config['SIPSTORE_ARCHIVER_METADATA_TYPES']
         files = []
         for m in self.sip.metadata:
-            if m.type.name in m_names:
-                files.append(self._generate_sipmetadata_info(m))
+            files.append(self._generate_sipmetadata_info(m))
         return files
 
     def _get_extra_files(self, data_files, metadata_files):
@@ -351,10 +348,9 @@ class BaseArchiver(object):
 
         By the default when 'filesinfo' is omitted, the base archiver
         will generate the file info for all attached SIPFiles and SIPMetadata
-        files (but only those which SIPMetadata.type.name was specified in the
-        `SIPSTORE_ARCHIVER_METADATA_TYPES`). Specific archivers are expected
-        to overwrite the `self.get_all_files` method, or craft the
-        `filesinfo` parameter of this method externally.
+        files. Specific archivers are expected to overwrite the
+        `self.get_all_files` method, or craft the `filesinfo` parameter of
+        this method externally.
 
         For more information on the structure of the file-info dict, see
         JSON Schema: invenio_sipstore.jsonschemas.sipstore.file-v1.0.0.json.
