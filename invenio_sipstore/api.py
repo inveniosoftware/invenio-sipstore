@@ -155,7 +155,7 @@ class SIP(object):
         :rtype: :py:class:`invenio_sipstore.api.SIP`
         """
         if not user_id:
-            user_id = (None if current_user.is_anonymous
+            user_id = (None if not current_user or current_user.is_anonymous
                        else current_user.get_id())
         if not agent:
             agent_factory = import_string(
