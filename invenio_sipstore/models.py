@@ -263,3 +263,8 @@ class RecordSIP(db.Model, Timestamp):
     pid = db.relationship(PersistentIdentifier, backref='record_sips',
                           foreign_keys=[pid_id])
     """Relation to the PID associated with the record SIP."""
+
+    @classmethod
+    def get_by_sip(cls, sip_id):
+        """Return the corresponding PIDs from SIP."""
+        return cls.query.filter_by(sip_id=sip_id).all()
