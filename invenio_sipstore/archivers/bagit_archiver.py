@@ -150,9 +150,10 @@ class BagItArchiver(BaseArchiver):
                             for f in filesinfo)
         return self._generate_extra_info(content, 'fetch.txt')
 
-    def _generate_md5manifest_content(self, filesinfo):
-        content = '\n'.join('{0} {1}'.format(self._get_checksum(
-                   f['checksum']), f['filepath']) for f in filesinfo)
+    def _generate_manifest_content(self, filesinfo, checksum_algorithm=None):
+        content = '\n'.join('{0} {1}'.format(
+            self._get_checksum(f['checksum'], checksum_algorithm),
+            f['filepath']) for f in filesinfo)
         return content
 
     def get_manifest_file(self, filesinfo):
@@ -161,8 +162,9 @@ class BagItArchiver(BaseArchiver):
         :return: the name of the file and its content
         :rtype: tuple
         """
-        content = self._generate_md5manifest_content(filesinfo)
-        return self._generate_extra_info(content, 'manifest-md5.txt')
+        content = self._generate_manifest_content(filesinfo)
+        filename = "manifest-{}.txt".format(self.checksum_algorithm)
+        return self._generate_extra_info(content, filename)
 
     def _generate_payload_oxum(self, filesinfo):
         return "{0}.{1}".format(
@@ -225,8 +227,9 @@ class BagItArchiver(BaseArchiver):
         :return: the name of the file and its content
         :rtype: tuple
         """
-        content = self._generate_md5manifest_content(filesinfo)
-        return self._generate_extra_info(content, 'tagmanifest-md5.txt')
+        content = self._generate_manifest_content(filesinfo)
+        filename = "tagmanifest-{}.txt".format(self.checksum_algorithm)
+        return self._generate_extra_info(content, filename)
 
     def get_all_files(self):
         """Create the BagIt metadata object."""
@@ -333,12 +336,3 @@ class BagItArchiver(BaseArchiver):
                            if not self._is_fetched(fi)]
         return super(BagItArchiver, self).write_all_files(
             filesinfo=write_filesinfo)
-
-    @staticmethod
-    def _get_checksum(checksum, expected='md5'):
-        """Return the checksum if the type is the expected."""
-        checksum = checksum.split(':')
-        if checksum[0] != expected or len(checksum) != 2:
-            raise AttributeError('Checksum format is not correct.')
-        else:
-            return checksum[1]

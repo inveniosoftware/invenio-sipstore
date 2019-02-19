@@ -28,6 +28,9 @@ SIPSTORE_AGENT_TAGS_FACTORY = \
     'invenio_sipstore.archivers.BagItArchiver._generate_agent_tags'
 """Factory to build agent information tags."""
 
+SIPSTORE_CHECKSUM_ALGORITHM = 'md5'
+"""Checksum algorithm to use. Available options ['md5', 'adler32']"""
+
 SIPSTORE_FILEPATH_MAX_LEN = 1024
 """Max filepath length."""
 
