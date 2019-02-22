@@ -15,6 +15,7 @@ to worry about e.g. files to disk.
 from __future__ import absolute_import, print_function, unicode_literals
 
 import os
+import zlib
 from hashlib import md5
 
 from flask import current_app
@@ -26,6 +27,31 @@ from ..api import SIP
 from ..models import SIPMetadata
 from ..signals import sipstore_archiver_status
 
+
+def get_md5_hex(content):
+    """Calculate MD5 checksum.
+
+    : param bytes content: Content to calculate the checksum.
+
+    :returns: Return the value of the checksum
+    :rtype: str
+    """
+    return md5(content).hexdigest()
+
+def get_adler32_hex(content):
+    """Calculate Adler32 checksum.
+
+    : param bytes content: Content to calculate the checksum.
+
+    :returns: Return the value of the checksum
+    :rtype: str
+    """
+    return hex(zlib.adler32(content, 1) & 0xffffffff)[2:]
+
+CHECKSUM_ALGORITHMS = {
+    "md5": get_md5_hex,
+    "adler32": get_adler32_hex
+}
 
 class BaseArchiver(object):
     """Base archiver.
@@ -101,6 +127,18 @@ class BaseArchiver(object):
         self.storage_factory = storage_factory or \
             current_sipstore.storage_factory
         self.filenames_mapping_file = filenames_mapping_file
+        self.checksum_algorithm = current_app.config.get(
+            'SIPSTORE_CHECKSUM_ALGORITHM', 'md5')
+
+    def _get_checksum(self, checksum, checksum_algorithm=None):
+        """Return the checksum if the type is the expected."""
+        _checksum_algorithm = checksum_algorithm if checksum_algorithm \
+            else self.checksum_algorithm
+        checksum = checksum.split(':')
+        if checksum[0] != _checksum_algorithm or len(checksum) != 2:
+            raise AttributeError('Checksum format is not correct.')
+        else:
+            return checksum[1]
 
     def get_archive_base_uri(self):
         """Get the base URI (absolute path) for the archive location.
@@ -172,13 +210,18 @@ class BaseArchiver(object):
             sipfilepath=sipfile.filepath,
         )
 
+    def _calculate_checksum(self, content):
+        """Calculate checksum for given content."""
+        digest = CHECKSUM_ALGORITHMS[self.checksum_algorithm](content)
+
+        return "{}:{}".format(self.checksum_algorithm, str(digest))
+
     def _generate_sipmetadata_info(self, sipmetadata):
         """Generate the file information dictionary from a SIP metadata."""
         filename = current_sipstore.sipmetadata_name_formatter(sipmetadata)
         filepath = os.path.join(self.metadata_dir, filename)
         return dict(
-            checksum='md5:{}'.format(str(
-                md5(sipmetadata.content.encode('utf-8')).hexdigest())),
+            checksum=self._calculate_checksum(sipmetadata.content.encode('utf-8')),
             size=len(sipmetadata.content),
             filepath=filepath,
             fullpath=self.get_fullpath(filepath),
@@ -189,8 +232,7 @@ class BaseArchiver(object):
         """Generate the file information dictionary from a raw content."""
         filepath = os.path.join(self.extra_dir, filename)
         return dict(
-            checksum='md5:{}'.format(
-                    str(md5(content.encode('utf-8')).hexdigest())),
+            checksum=self._calculate_checksum(content.encode('utf-8')),
             size=len(content),
             filepath=filepath,
             fullpath=self.get_fullpath(filepath),
