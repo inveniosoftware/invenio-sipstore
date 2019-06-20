@@ -18,5 +18,5 @@ New formats can be implemented by subclassing
 
 from __future__ import absolute_import, print_function
 
-from .base_archiver import BaseArchiver
 from .bagit_archiver import BagItArchiver
+from .base_archiver import BaseArchiver
