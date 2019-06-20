@@ -6,10 +6,10 @@
     under the terms of the MIT License; see LICENSE file for more details.
 
 ===========================
- Invenio-SIPStore v1.0.0a7
+ Invenio-SIPStore v1.0.0a8
 ===========================
 
-Invenio-SIPStore v1.0.0a7 was released on August 18, 2017.
+Invenio-SIPStore v1.0.0a8 was released on June 20, 2019.
 
 About
 -----
@@ -26,7 +26,7 @@ What's new
 Installation
 ------------
 
-   $ pip install invenio-sipstore==v1.0.0a7
+   $ pip install invenio-sipstore==v1.0.0a8
 
 Documentation
 -------------
