@@ -20,9 +20,10 @@ from six import string_types
 from werkzeug.utils import import_string
 
 from invenio_sipstore.api import SIP
-from invenio_sipstore.archivers import BaseArchiver
 from invenio_sipstore.models import SIPMetadata, SIPMetadataType, \
     current_jsonschemas
+
+from .base_archiver import BaseArchiver
 
 
 class BagItArchiver(BaseArchiver):
