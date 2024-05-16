@@ -2,6 +2,7 @@
 #
 # This file is part of Invenio.
 # Copyright (C) 2016-2019 CERN.
+# Copyright (C) 2024 TU Wien.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -9,32 +10,27 @@
 
 """Pytest configuration."""
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import os
 import shutil
 import tempfile
+from io import BytesIO
 
 import pytest
-from flask import Flask
-from fs.opener import opener
-from invenio_accounts import InvenioAccounts
-from invenio_db import InvenioDB
+from fs.opener import open_fs
+from invenio_access.permissions import system_identity
+from invenio_app.factory import create_app as _create_app
 from invenio_db import db as db_
-from invenio_files_rest import InvenioFilesREST
 from invenio_files_rest.models import FileInstance, Location
-from invenio_jsonschemas import InvenioJSONSchemas
-from six import BytesIO, b
-from sqlalchemy_utils.functions import create_database, database_exists, \
-    drop_database
+from invenio_vocabularies.proxies import current_service as vocabulary_service
+from invenio_vocabularies.records.api import Vocabulary
 
-from invenio_sipstore import InvenioSIPStore
 from invenio_sipstore.api import SIP as SIPApi
-from invenio_sipstore.archivers import BagItArchiver
+from invenio_sipstore.archivers.bagit_archiver import BagItArchiver
 from invenio_sipstore.models import SIP, SIPFile, SIPMetadataType
+from invenio_sipstore.proxies import current_sipstore
 
 
-@pytest.yield_fixture(scope='session')
+@pytest.fixture(scope="session")
 def instance_path():
     """Default instance path."""
     path = tempfile.mkdtemp()
@@ -44,56 +40,49 @@ def instance_path():
     shutil.rmtree(path)
 
 
-@pytest.fixture()
-def base_app(instance_path):
-    """Flask application fixture."""
-    app = Flask('testapp', instance_path=instance_path)
-    app.config.update(
-        TESTING=True,
-        SECRET_KEY='CHANGE_ME',
-        SECURITY_PASSWORD_SALT='CHANGE_ME',
-        SQLALCHEMY_DATABASE_URI=os.environ.get(
-            'SQLALCHEMY_DATABASE_URI', 'sqlite:///test.db'),
+@pytest.fixture(scope="module")
+def app_config(app_config):
+    app_config["TESTING"] = True
+    app_config["SECRET_KEY"] = "CHANGE_ME"
+    app_config["SECURITY_PASSWORD_SALT"] = "CHANGE_ME"
+
+    # JSONSchema configuration
+    app_config["JSONSCHEMAS_HOST"] = "not-used"
+    app_config["RECORDS_REFRESOLVER_STORE"] = (
+        "invenio_jsonschemas.proxies.current_refresolver_store"
     )
-    InvenioSIPStore(app)
-    return app
+    app_config["RECORDS_REFRESOLVER_CLS"] = (
+        "invenio_records.resolver.InvenioRefResolver"
+    )
+
+    # file storage classes
+    app_config["FILES_REST_STORAGE_CLASS_LIST"] = {
+        "L": "Local",
+        "F": "Fetch",
+        "R": "Remote",
+    }
+    app_config["FILES_REST_DEFAULT_STORAGE_CLASS"] = "L"
+
+    # test-friendly default config
+    app_config["SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER"] = (
+        "invenio_sipstore.archivers.utils.simple_sipfile_name_formatter"
+    )
+
+    return app_config
 
 
-@pytest.yield_fixture()
-def app(base_app):
-    """Flask application fixture."""
-    InvenioDB(base_app)
-    InvenioAccounts(base_app)
-    InvenioFilesREST(base_app)
-    InvenioJSONSchemas(base_app)
-    with base_app.app_context():
-        yield base_app
-
-
-@pytest.yield_fixture()
-def db(app):
-    """Setup database."""
-    if not database_exists(str(db_.engine.url)):
-        create_database(str(db_.engine.url))
-    db_.create_all()
-    yield db_
-    db_.session.remove()
-    db_.drop_all()
-    drop_database(str(db_.engine.url))
+@pytest.fixture(scope="module")
+def create_app(instance_path):
+    """Application factory fixture."""
+    return _create_app
 
 
 @pytest.fixture()
 def locations(db, instance_path):
     """File system location."""
-    default = Location(
-        name='default',
-        uri=instance_path,
-        default=True
-    )
+    default = Location(name="default", uri=instance_path, default=True)
     archive = Location(
-        name='archive',
-        uri=os.path.join(instance_path, 'archive'),
-        default=False
+        name="archive", uri=os.path.join(instance_path, "archive"), default=False
     )
     db.session.add(default)
     db.session.add(archive)
@@ -105,22 +94,17 @@ def locations(db, instance_path):
 def sip_metadata_types(db):
     """Add a SIP metadata type (internal use only) for BagIt."""
     bagit_type = SIPMetadataType(
-        title='BagIt Archiver Metadata',
+        title="BagIt Archiver Metadata",
         name=BagItArchiver.bagit_metadata_type_name,
-        format='json',
-        )
+        format="json",
+    )
     json_type = SIPMetadataType(
-        title='Record JSON Metadata',
-        name='json-test',
-        format='json')
+        title="Record JSON Metadata", name="json-test", format="json"
+    )
     xml_type = SIPMetadataType(
-        title='Record MARCXML Metadata',
-        name='marcxml-test',
-        format='xml')
-    txt_type = SIPMetadataType(
-        title='Raw Text Metadata',
-        name='txt-test',
-        format='txt')
+        title="Record MARCXML Metadata", name="marcxml-test", format="xml"
+    )
+    txt_type = SIPMetadataType(title="Raw Text Metadata", name="txt-test", format="txt")
 
     db.session.add(bagit_type)
     db.session.add(json_type)
@@ -143,51 +127,53 @@ def sips(db, locations, sip_metadata_types):
     SIP-4: File4, File5, File6
     """
     # A SIP with agent info
-    sip1 = SIP.create(agent={
-        'email': 'spiderpig@invenio.org',
-        'orcid': '1111-1111-1111-1111',
-        'ip_address': '1.1.1.1'
-    })
+    sip1 = SIP.create(
+        agent={
+            "email": "spiderpig@invenio.org",
+            "orcid": "1111-1111-1111-1111",
+            "ip_address": "1.1.1.1",
+        }
+    )
     sip1api = SIPApi(sip1)
-    sip1api.attach_metadata('marcxml-test', '<p>XML 1</p>')
-    sip1api.attach_metadata('json-test', '{"title": "JSON 1"}')
+    sip1api.attach_metadata("marcxml-test", "<p>XML 1</p>")
+    sip1api.attach_metadata("json-test", '{"title": "JSON 1"}')
     # Metadata 'txt-test', although attached should not be archived
     # (see conftest configuration)
-    sip1api.attach_metadata('txt-test', 'Title: TXT 1')
+    sip1api.attach_metadata("txt-test", "Title: TXT 1")
     file1 = FileInstance.create()
-    file1.set_contents(BytesIO(b('test')),
-                       default_location=locations['default'].uri)
-    sip1file1 = SIPFile(sip_id=sip1.id, filepath="foobar.txt",
-                        file_id=file1.id)
+    file1.set_contents(
+        BytesIO(("test".encode())), default_location=locations["default"].uri
+    )
+    sip1file1 = SIPFile(sip_id=sip1.id, filepath="foobar.txt", file_id=file1.id)
 
     db_.session.add(sip1file1)
 
     sip2 = SIP.create()
     sip2api = SIPApi(sip2)
-    sip2api.attach_metadata('marcxml-test', '<p>XML 2</p>')
-    sip2api.attach_metadata('json-test', '{"title": "JSON 2"}')
+    sip2api.attach_metadata("marcxml-test", "<p>XML 2</p>")
+    sip2api.attach_metadata("json-test", '{"title": "JSON 2"}')
     file2 = FileInstance.create()
-    file2.set_contents(BytesIO(b'test-second'),
-                       default_location=locations['default'].uri)
-    sip2file1 = SIPFile(sip_id=sip2.id, filepath="foobar.txt",
-                        file_id=file1.id)
-    sip2file2 = SIPFile(sip_id=sip2.id, filepath="foobar2.txt",
-                        file_id=file2.id)
+    file2.set_contents(
+        BytesIO("test-second".encode()), default_location=locations["default"].uri
+    )
+    sip2file1 = SIPFile(sip_id=sip2.id, filepath="foobar.txt", file_id=file1.id)
+    sip2file2 = SIPFile(sip_id=sip2.id, filepath="foobar2.txt", file_id=file2.id)
 
     db_.session.add(sip2file1)
     db_.session.add(sip2file2)
 
     sip3 = SIP.create()
     sip3api = SIPApi(sip3)
-    sip3api.attach_metadata('marcxml-test', '<p>XML 3</p>')
-    sip3api.attach_metadata('json-test', '{"title": "JSON 3"}')
+    sip3api.attach_metadata("marcxml-test", "<p>XML 3</p>")
+    sip3api.attach_metadata("json-test", '{"title": "JSON 3"}')
     file3 = FileInstance.create()
-    file3.set_contents(BytesIO(b'test-third'),
-                       default_location=locations['default'].uri)
-    sip3file2 = SIPFile(sip_id=sip3.id, filepath="foobar2-renamed.txt",
-                        file_id=file2.id)
-    sip3file3 = SIPFile(sip_id=sip3.id, filepath="foobar3.txt",
-                        file_id=file3.id)
+    file3.set_contents(
+        BytesIO("test-third".encode()), default_location=locations["default"].uri
+    )
+    sip3file2 = SIPFile(
+        sip_id=sip3.id, filepath="foobar2-renamed.txt", file_id=file2.id
+    )
+    sip3file3 = SIPFile(sip_id=sip3.id, filepath="foobar3.txt", file_id=file3.id)
 
     db_.session.add(sip3file2)
     db_.session.add(sip3file3)
@@ -195,28 +181,31 @@ def sips(db, locations, sip_metadata_types):
     # A SIP with naughty filenames
     sip4 = SIP.create()
     sip4api = SIPApi(sip4)
-    sip4api.attach_metadata('marcxml-test', '<p>XML 4 żółć</p>')
-    sip4api.attach_metadata('json-test', '{"title": "JSON 4 żółć"}')
+    sip4api.attach_metadata("marcxml-test", "<p>XML 4 żółć</p>")
+    sip4api.attach_metadata("json-test", '{"title": "JSON 4 żółć"}')
     file4 = FileInstance.create()
-    file4.set_contents(BytesIO('test-fourth żółć'.encode('utf-8')),
-                       default_location=locations['default'].uri)
+    file4.set_contents(
+        BytesIO("test-fourth żółć".encode("utf-8")),
+        default_location=locations["default"].uri,
+    )
     file5 = FileInstance.create()
-    file5.set_contents(BytesIO('test-fifth ąęćźə'.encode('utf-8')),
-                       default_location=locations['default'].uri)
+    file5.set_contents(
+        BytesIO("test-fifth ąęćźə".encode("utf-8")),
+        default_location=locations["default"].uri,
+    )
 
     file6 = FileInstance.create()
-    file6.set_contents(BytesIO('test-sixth π'.encode('utf-8')),
-                       default_location=locations['default'].uri)
-    sip5file4 = SIPFile(sip_id=sip4.id, filepath="../../foobar.txt",
-                        file_id=file4.id)
+    file6.set_contents(
+        BytesIO("test-sixth π".encode("utf-8")),
+        default_location=locations["default"].uri,
+    )
+    sip5file4 = SIPFile(sip_id=sip4.id, filepath="../../foobar.txt", file_id=file4.id)
 
-    sip5file5 = SIPFile(sip_id=sip4.id,
-                        filepath="http://maliciouswebsite.com/hack.js",
-                        file_id=file5.id)
+    sip5file5 = SIPFile(
+        sip_id=sip4.id, filepath="http://maliciouswebsite.com/hack.js", file_id=file5.id
+    )
 
-    sip5file6 = SIPFile(sip_id=sip4.id,
-                        filepath="łóżźćąę.dat",
-                        file_id=file6.id)
+    sip5file6 = SIPFile(sip_id=sip4.id, filepath="łóżźćąę.dat", file_id=file6.id)
 
     db_.session.add(sip5file4)
     db_.session.add(sip5file5)
@@ -225,38 +214,78 @@ def sips(db, locations, sip_metadata_types):
     # A SIP with metadata-only changes
     sip5 = SIP.create()
     sip5api = SIPApi(sip5)
-    sip5api.attach_metadata('marcxml-test', '<p>XML 5 Meta Only</p>')
+    sip5api.attach_metadata("marcxml-test", "<p>XML 5 Meta Only</p>")
 
     db_.session.commit()
     return [sip1api, sip2api, sip3api, sip4api, sip5api]
 
 
-@pytest.yield_fixture()
+@pytest.fixture()
 def archive_fs(locations):
     """Fixture to check the BagIt file generation."""
-    archive_path = locations['archive'].uri
-    fs = opener.opendir(archive_path, writeable=False, create_dir=True)
+    archive_path = locations["archive"].uri
+    fs = open_fs(archive_path, writeable=False, create=True)
     yield fs
-    for d in fs.listdir():
-        fs.removedir(d, force=True)
+    for d in fs.listdir("."):
+        fs.removetree(d)
 
 
-@pytest.yield_fixture()
-def secure_sipfile_name_formatter(app):
+@pytest.fixture()
+def secure_uuid_sipfile_name_formatter(app):
     """Temporarily change the default name formatter for SIPFiles."""
-    fmt = app.config['SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER']
-    app.config['SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER'] = \
-        'invenio_sipstore.archivers.utils.secure_sipfile_name_formatter'
+    fmt = app.config["SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER"]
+    app.config["SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER"] = (
+        "invenio_sipstore.archivers.utils.secure_uuid_sipfile_name_formatter"
+    )
+    # clear the cache
+    del current_sipstore.sipfile_name_formatter
+
     yield
-    app.config['SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER'] = fmt
+    app.config["SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER"] = fmt
+    del current_sipstore.sipfile_name_formatter
 
 
-@pytest.yield_fixture()
+@pytest.fixture()
 def custom_sipmetadata_name_formatter(app):
     """Temporarily change the default name formatter for SIPMetadata files."""
-    fmt = app.config['SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER']
+    fmt = app.config["SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER"]
+    app.config["SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER"] = (
+        lambda sm: f"{sm.type.name}-metadata.{sm.type.format}"
+    )
 
-    app.config['SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER'] = \
-        lambda sm: '{0}-metadata.{1}'.format(sm.type.name, sm.type.format)
+    # clear the cache
+    del current_sipstore.sipmetadata_name_formatter
+
     yield
-    app.config['SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER'] = fmt
+    app.config["SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER"] = fmt
+    del current_sipstore.sipmetadata_name_formatter
+
+
+@pytest.fixture()
+def running_app(app):
+    """A running app with relevant RDM features enabled."""
+    vocabulary_service.create_type(system_identity, "resourcetypes", "rsrct")
+
+    vocabulary_service.create(
+        system_identity,
+        {
+            "id": "image-photo",
+            "props": {
+                "csl": "graphic",
+                "datacite_general": "Image",
+                "datacite_type": "Photo",
+                "openaire_resourceType": "25",
+                "openaire_type": "dataset",
+                "eurepo": "info:eu-repo/semantic/other",
+                "schema.org": "https://schema.org/Photograph",
+                "subtype": "image-photo",
+                "type": "image",
+            },
+            "icon": "chart bar outline",
+            "title": {"en": "Photo"},
+            "tags": ["depositable", "linkable"],
+            "type": "resourcetypes",
+        },
+    )
+
+    Vocabulary.index.refresh()

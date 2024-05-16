@@ -17,7 +17,7 @@
       "type": "number"
     },
     "checksum": {
-      "description": "MD5 checksum of the file. Always starts with 'md5:' prefix.",
+      "description": "Checksum of the file. Always prefixed with the hash algorithm's name and a colon.",
       "type": "string"
     },
     "file_uuid": {

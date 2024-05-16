@@ -2,6 +2,7 @@
 #
 # This file is part of Invenio.
 # Copyright (C) 2016-2019 CERN.
+# Copyright (C) 2024 TU Wien.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -21,7 +22,7 @@ from invenio_sipstore.models import SIPFile, SIPMetadata, SIPMetadataType
 from invenio_sipstore.signals import sipstore_created
 
 
-class SIP(object):
+class SIP:
     """API for managing SIPs."""
 
     def __init__(self, sip):
@@ -31,23 +32,6 @@ class SIP(object):
         :type sip: :py:class:`invenio_sipstore.models.SIP`
         """
         self.model = sip
-
-    @staticmethod
-    def _build_agent_info():
-        """Build the SIP agent info.
-
-        This method can be changed in the config to suit your needs, see
-        :py:data:`invenio_sipstore.config.SIPSTORE_AGENT_FACTORY`
-
-        :returns: Agent information regarding the SIP.
-        :rtype: dict
-        """
-        agent = dict()
-        if has_request_context() and request.remote_addr:
-            agent['ip_address'] = request.remote_addr
-            if current_user.is_authenticated and current_user.email:
-                agent['email'] = current_user.email
-        return agent
 
     @property
     def id(self):
@@ -130,8 +114,7 @@ class SIP(object):
         return sm
 
     @classmethod
-    def create(cls, archivable, files=None, metadata=None, user_id=None,
-               agent=None):
+    def create(cls, archivable, files=None, metadata=None, user_id=None, agent=None):
         """Create a SIP, from the PID and the Record.
 
         Apart from the SIP itself, it also creates ``SIPFile`` objects for
@@ -155,18 +138,19 @@ class SIP(object):
         :rtype: :py:class:`invenio_sipstore.api.SIP`
         """
         if not user_id:
-            user_id = (None if not current_user or current_user.is_anonymous
-                       else current_user.get_id())
+            user_id = (
+                None
+                if not current_user or current_user.is_anonymous
+                else current_user.get_id()
+            )
         if not agent:
-            agent_factory = import_string(
-                current_app.config['SIPSTORE_AGENT_FACTORY'])
+            agent_factory = import_string(current_app.config["SIPSTORE_AGENT_FACTORY"])
             agent = agent_factory()
         files = [] if not files else files
         metadata = {} if not metadata else metadata
 
         with db.session.begin_nested():
-            sip = cls(SIP_.create(user_id=user_id, agent=agent,
-                                  archivable=archivable))
+            sip = cls(SIP_.create(user_id=user_id, agent=agent, archivable=archivable))
             for f in files:
                 sip.attach_file(f)
             for type, content in metadata.items():
@@ -177,10 +161,10 @@ class SIP(object):
     @classmethod
     def get_sip(cls, uuid):
         """Get a SIP API object from the UUID if a model object."""
-        return cls(SIP_.query.filter_by(id=uuid).one())
+        return cls(db.session.query(SIP_).get(uuid))
 
 
-class RecordSIP(object):
+class RecordSIP:
     """API for managing SIPRecords."""
 
     def __init__(self, recordsip, sip):
@@ -204,9 +188,16 @@ class RecordSIP(object):
         return self._sip
 
     @classmethod
-    def create(cls, pid, record, archivable, create_sip_files=True,
-               user_id=None, agent=None, sip_metadata_type=None):
-        """Create a SIP, from the PID and the Record.
+    def create(
+        cls,
+        record,
+        archivable,
+        create_sip_files=True,
+        user_id=None,
+        agent=None,
+        sip_metadata_type=None,
+    ):
+        """Create a SIP from the Record.
 
         Apart from the SIP itself, it also creates ``RecordSIP`` for the
         SIP-PID-Record relationship, as well as ``SIPFile`` objects for each
@@ -216,8 +207,6 @@ class RecordSIP(object):
         the corresponding RecordSIP attributes ``sip``, ``sip.files`` and
         ``sip.metadata``.
 
-        :param pid: PID of the published record ('recid').
-        :type pid: :py:class:`invenio_pidstore.models.PersistentIdentifier`
         :param record: Record for which the SIP should be created.
         :type record: :py:class:`invenio_records.api.Record`
         :param bool archivable: tells if the record should be archived.
@@ -232,16 +221,42 @@ class RecordSIP(object):
         :returns: RecordSIP object.
         :rtype: :py:class:`invenio_sipstore.api.RecordSIP`
         """
-        files = record.files if create_sip_files else None
+        if create_sip_files and record.files.enabled:
+            files = [rf.file for rf in record.files.values()]
+        else:
+            files = []
+
         if sip_metadata_type:
             mtype = SIPMetadataType.get_from_name(sip_metadata_type)
         else:
-            mtype = SIPMetadataType.get_from_schema(record['$schema'])
+            mtype = SIPMetadataType.get_from_schema(record["$schema"])
+
         metadata = {mtype.name: json.dumps(record.dumps())}
+
         with db.session.begin_nested():
-            sip = SIP.create(archivable, files=files, metadata=metadata,
-                             user_id=user_id, agent=agent)
-            model = RecordSIP_(sip_id=sip.id, pid_id=pid.id)
+            sip = SIP.create(
+                archivable, files=files, metadata=metadata, user_id=user_id, agent=agent
+            )
+            model = RecordSIP_(sip_id=sip.id, pid_id=record.pid.id)
             db.session.add(model)
             recsip = cls(model, sip)
+
         return recsip
+
+
+def default_agent_info_builder():
+    """Default builder for the SIP agent info, with IP and email address.
+
+    This method can be changed in the config to suit your needs, see
+    :py:data:`invenio_sipstore.config.SIPSTORE_AGENT_FACTORY`
+
+    :returns: Agent information regarding the SIP.
+    :rtype: dict
+    """
+    agent = {}
+    if has_request_context() and request.remote_addr:
+        agent["ip_address"] = request.remote_addr
+        if current_user and current_user.is_authenticated and current_user.email:
+            agent["email"] = current_user.email
+
+    return agent

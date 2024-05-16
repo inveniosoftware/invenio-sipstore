@@ -51,10 +51,6 @@ Signals
 Utilities
 ---------
 
-.. automodule:: invenio_sipstore.utils
-    :members:
-
-
 .. automodule:: invenio_sipstore.archivers.utils
     :members:
 
@@ -78,11 +74,3 @@ BagIt archiver
 .. automodule:: invenio_sipstore.archivers.bagit_archiver
     :members:
     :private-members:
-
-
-Admin
------
-
-.. automodule:: invenio_sipstore.admin
-    :members:
-

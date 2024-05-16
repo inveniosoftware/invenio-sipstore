@@ -2,22 +2,22 @@
 #
 # This file is part of Invenio.
 # Copyright (C) 2016-2019 CERN.
+# Copyright (C) 2024 TU Wien.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
 """Submission Information Package store for Invenio."""
 
-from __future__ import absolute_import, print_function
-
+from invenio_base.utils import load_or_import_from_config
+from invenio_db import db
 from invenio_files_rest.models import Location
 from werkzeug.utils import cached_property
 
 from . import config
-from .utils import load_or_import_from_config
 
 
-class _InvenioSIPStoreState(object):
+class _InvenioSIPStoreState:
     """Invenio SIPStore state."""
 
     def __init__(self, app):
@@ -27,9 +27,7 @@ class _InvenioSIPStoreState(object):
     @cached_property
     def storage_factory(self):
         """Load default storage factory."""
-        return load_or_import_from_config(
-            'SIPSTORE_FILE_STORAGE_FACTORY', app=self.app
-        )
+        return load_or_import_from_config("SIPSTORE_FILE_STORAGE_FACTORY", app=self.app)
 
     @cached_property
     def archive_location(self):
@@ -38,29 +36,29 @@ class _InvenioSIPStoreState(object):
         :rtype: str
         :return: URI to the archive root.
         """
-        name = self.app.config['SIPSTORE_ARCHIVER_LOCATION_NAME']
-        return Location.query.filter_by(name=name).one().uri
+        name = self.app.config["SIPSTORE_ARCHIVER_LOCATION_NAME"]
+        return db.session.query(Location).filter_by(name=name).one().uri
 
     @cached_property
     def archive_path_builder(self):
         return load_or_import_from_config(
-            'SIPSTORE_ARCHIVER_DIRECTORY_BUILDER', app=self.app
+            "SIPSTORE_ARCHIVER_DIRECTORY_BUILDER", app=self.app
         )
 
     @cached_property
     def sipmetadata_name_formatter(self):
         return load_or_import_from_config(
-            'SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER', app=self.app
+            "SIPSTORE_ARCHIVER_SIPMETADATA_NAME_FORMATTER", app=self.app
         )
 
     @cached_property
     def sipfile_name_formatter(self):
         return load_or_import_from_config(
-            'SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER', app=self.app
+            "SIPSTORE_ARCHIVER_SIPFILE_NAME_FORMATTER", app=self.app
         )
 
 
-class InvenioSIPStore(object):
+class InvenioSIPStore:
     """Invenio-SIPStore extension."""
 
     def __init__(self, app=None):
@@ -71,10 +69,10 @@ class InvenioSIPStore(object):
     def init_app(self, app):
         """Flask application initialization."""
         self.init_config(app)
-        app.extensions['invenio-sipstore'] = _InvenioSIPStoreState(app)
+        app.extensions["invenio-sipstore"] = _InvenioSIPStoreState(app)
 
     def init_config(self, app):
         """Initialize configuration."""
         for k in dir(config):
-            if k.startswith('SIPSTORE_'):
+            if k.startswith("SIPSTORE_"):
                 app.config.setdefault(k, getattr(config, k))
